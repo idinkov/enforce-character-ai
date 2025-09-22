@@ -1,0 +1,131 @@
+models:
+  yolov5:
+    name: "YOLOv5 Model"
+    version: "7.0"
+    filename: "yolov5su.pt"
+    download_url: "https://github.com/ultralytics/yolov5/releases/download/v7.0/yolov5s.pt"
+    local_path: "models/yolov5su.pt"
+    file_size_mb: 14.1
+    description: "YOLOv5 small model for object detection"
+    model_type: "detection"
+    framework: "pytorch"
+    required: true
+    is_trainable: false
+
+  gfpgan:
+    name: "GFPGAN Model"
+    version: "1.4"
+    filename: "GFPGANv1.4.pth"
+    download_url: "https://github.com/TencentARC/GFPGAN/releases/download/v1.3.0/GFPGANv1.4.pth"
+    local_path: "models/GFPGANv1.4.pth"
+    file_size_mb: 348.6
+    description: "GFPGAN model for face restoration and enhancement"
+    model_type: "enhancement"
+    framework: "pytorch"
+    required: true
+    is_trainable: false
+
+  u2net_human_seg:
+    name: "U2Net Human Segmentation"
+    version: "0.0.0"
+    filename: "u2net_human_seg.onnx"
+    download_url: "https://github.com/danielgatis/rembg/releases/download/v0.0.0/u2net_human_seg.onnx"
+    local_path: "models/u2net_human_seg.onnx"
+    file_size_mb: 176.3
+    description: "U2Net model for human segmentation and background removal"
+    model_type: "segmentation"
+    framework: "onnx"
+    required: true
+    is_trainable: false
+
+  img2img_sdxl_inpaint:
+    name: "Stable Diffusion XL Inpaint"
+    version: "1.0"
+    filename: "sd_xl_base_1.0_inpainting_0.1.safetensors"
+    download_url: "https://huggingface.co/benjamin-paine/sd-xl-alternative-bases/blob/main/sd_xl_base_1.0_inpainting_0.1.safetensors"
+    local_path: "models/StableDiffusion/sd_xl_base_1.0_inpainting_0.1.safetensors"
+    file_size_mb: 6938.0
+    description: "Stable Diffusion XL model optimized for inpainting tasks"
+    model_type: "inpainting"
+    framework: "diffusers"
+    required: true
+    # Hugging Face configuration
+    download_method: "huggingface"
+    huggingface_repo: "benjamin-paine/sd-xl-alternative-bases"
+    huggingface_filename: "sd_xl_base_1.0_inpainting_0.1.safetensors"
+
+  sd_xl_base_1_0_0_9vae:
+    name: "Stable Diffusion XL Base 1.0 with 0.9 VAE"
+    version: "1.0"
+    filename: "sd_xl_base_1.0_0.9vae.safetensors"
+    download_url: "https://huggingface.co/stabilityai/stable-diffusion-xl-base-1.0/blob/main/sd_xl_base_1.0_0.9vae.safetensors"
+    local_path: "models/StableDiffusion/sd_xl_base_1.0_0.9vae.safetensors"
+    file_size_mb: 6938.0
+    description: "Stable Diffusion XL base model with improved 0.9 VAE for better image quality"
+    model_type: "text2img"
+    framework: "diffusers"
+    required: true
+    is_trainable: true
+    train_suffix: "XL"
+    # Hugging Face configuration
+    download_method: "huggingface"
+    huggingface_repo: "stabilityai/stable-diffusion-xl-base-1.0"
+    huggingface_filename: "sd_xl_base_1.0_0.9vae.safetensors"
+
+  juggernaut_xl_v8:
+    name: "Juggernaut XL v8"
+    version: "8"
+    filename: "juggernautXL_v8Rundiffusion.safetensors"
+    download_url: "https://huggingface.co/RunDiffusion/Juggernaut-XL-v8/blob/main/juggernautXL_v8Rundiffusion.safetensors"
+    local_path: "models/StableDiffusion/juggernautXL_v8Rundiffusion.safetensors"
+    file_size_mb: 7110.0
+    description: "Juggernaut XL version 8 model tuned by RunDiffusion (Photo model improvements especially for hands, feet, and skin detail)"
+    model_type: "text2img"
+    framework: "diffusers"
+    required: false
+    is_trainable: false
+    train_suffix: "JuggernautXL"
+    # Hugging Face configuration
+    download_method: "huggingface"
+    huggingface_repo: "RunDiffusion/Juggernaut-XL-v8"
+    huggingface_filename: "juggernautXL_v8Rundiffusion.safetensors"
+
+  everclear_pny_by_zovya_v4:
+    name: "Everclear PNY by Zovya V4"
+    version: "V4"
+    filename: "everclearPNYByZovya_v4.safetensors"
+    download_url: "https://huggingface.co/xxxpo13/everclearPNYByZovya_v4/resolve/main/everclearPNYByZovya_v4.safetensors"
+    local_path: "models/StableDiffusion/everclearPNYByZovya_v4.safetensors"
+    file_size_mb: 6940.0
+    description: "Everclear PNY by Zovya V4 – photorealistic variant with improved faces and lighting"
+    model_type: "text2img"
+    framework: "diffusers"
+    required: true
+    is_trainable: true
+    train_suffix: "Everclear"
+    # Hugging Face configuration
+    download_method: "huggingface"
+    huggingface_repo: "xxxpo13/everclearPNYByZovya_v4"
+    huggingface_filename: "everclearPNYByZovya_v4.safetensors"
+
+  yolov8n_seg:
+    name: "YOLOv8n Segmentation Model"
+    version: "8.0"
+    filename: "yolov8n-seg.pt"
+    download_url: "https://github.com/ultralytics/assets/releases/download/v8.2.0/yolov8n-seg.pt"
+    local_path: "models/yolov8n-seg.pt"
+    file_size_mb: 6.7
+    description: "YOLOv8 nano segmentation model for object detection and segmentation"
+    model_type: "segmentation"
+    framework: "pytorch"
+    required: true
+    is_trainable: false
+
+
+# Model configuration settings
+config:
+  models_base_path: "models"
+  auto_download: true
+  verify_checksums: false
+  download_timeout: 300
+  max_retries: 3

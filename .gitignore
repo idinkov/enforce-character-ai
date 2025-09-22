@@ -1,0 +1,10 @@
+.venv
+.idea
+/models
+/repositories
+characters
+__pycache__
+*.pyc
+input
+/.internal
+/gfpgan
