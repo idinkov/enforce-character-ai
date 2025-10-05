@@ -20,8 +20,8 @@ except ImportError:
 class TwitterProvider(BaseProvider):
     """Provider for downloading media from Twitter."""
 
-    def __init__(self, character_name: Optional[str] = None):
-        super().__init__(character_name)
+    def __init__(self, character_name: Optional[str] = None, progress_callback=None, log_callback=None):
+        super().__init__(character_name, progress_callback, log_callback)
 
     def download(self, output_dir: str, **params) -> List[str]:
         """Download media from Twitter."""

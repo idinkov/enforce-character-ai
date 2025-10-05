@@ -32,7 +32,7 @@ class ImagesTab:
 
         # Create the tab
         self.frame = ttk.Frame(parent_notebook)
-        parent_notebook.add(self.frame, text="Images")
+        parent_notebook.add(self.frame, text="3.Images")
 
         # Initialize processing status dialog
         self.processing_dialog = ProcessingStatusDialog(

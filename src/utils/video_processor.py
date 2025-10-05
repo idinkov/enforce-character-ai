@@ -28,19 +28,36 @@ except ImportError:
 class VideoProcessor:
     """Handles video processing including scene detection and frame extraction."""
 
-    def __init__(self, default_frames_per_scene: int = 1, scene_threshold: float = 30.0):
+    def __init__(self, default_frames_per_scene: int = 1, scene_threshold: float = 30.0,
+                 progress_callback=None, log_callback=None):
         """
         Initialize video processor.
 
         Args:
             default_frames_per_scene: Default number of frames to extract per scene
             scene_threshold: Threshold for scene detection sensitivity (lower = more sensitive)
+            progress_callback: Callback for progress updates
+            log_callback: Callback for log messages
         """
         if not SCENEDETECT_AVAILABLE:
             raise ImportError("PySceneDetect is required. Install with: pip install scenedetect")
 
         self.default_frames_per_scene = default_frames_per_scene
         self.scene_threshold = scene_threshold
+        self.progress_callback = progress_callback
+        self.log_callback = log_callback
+
+    def log(self, message: str):
+        """Log a message if log callback is available."""
+        if self.log_callback:
+            self.log_callback(message)
+        else:
+            print(message)
+
+    def update_progress(self, current: int, total: int, message: str = ""):
+        """Update progress if progress callback is available."""
+        if self.progress_callback:
+            self.progress_callback(current, total, message)
 
     def _get_frame_number(self, time_or_tuple: Any, fps: float) -> int:
         """
@@ -120,35 +137,49 @@ class VideoProcessor:
         if not force_reprocess and scene_data_path.exists():
             try:
                 scene_data = self._load_scene_data(scene_data_path, video_path)
+                self.log(f"Using cached scene data for: {video_path.name}")
             except Exception as e:
-                print(f"Warning: Could not load cached scene data: {e}")
+                self.log(f"Warning: Could not load cached scene data: {e}")
                 scene_data = None
 
         # If no cached data or forced reprocessing, detect scenes
         if scene_data is None:
-            print(f"Detecting scenes in video: {video_path.name}")
+            self.log(f"Detecting scenes in video: {video_path.name}")
+            self.update_progress(0, 100, "Starting scene detection...")
             scene_data = self._detect_scenes(video_path)
             self._save_scene_data(scene_data, scene_data_path, video_path)
-        else:
-            print(f"Using cached scene data for: {video_path.name}")
 
         # Extract frames from scenes
+        self.update_progress(50, 100, "Extracting frames from scenes...")
         extracted_frames = self._extract_frames_from_scenes(
             video_path, scene_data['scenes'], output_dir, frames_per_scene
         )
 
+        self.update_progress(100, 100, "Video processing complete")
         return extracted_frames
 
     def _detect_scenes(self, video_path: Path) -> Dict[str, Any]:
         """Detect scenes in the video using PySceneDetect."""
+        self.log("Initializing scene detection...")
+        self.update_progress(10, 100, "Initializing video manager...")
+
         video_manager = VideoManager([str(video_path)])
         scene_manager = SceneManager()
         scene_manager.add_detector(ContentDetector(threshold=self.scene_threshold))
 
+        self.log(f"Scene detection threshold: {self.scene_threshold}")
+        self.update_progress(20, 100, "Starting video analysis...")
+
         # Start video processing
         video_manager.start()
+
+        self.log("Analyzing video for scene changes...")
+        self.update_progress(30, 100, "Detecting scenes...")
+
         scene_manager.detect_scenes(frame_source=video_manager)
         scene_list = scene_manager.get_scene_list()
+
+        self.update_progress(80, 100, "Processing scene data...")
 
         # Get video info
         fps = video_manager.get_framerate()
@@ -161,7 +192,7 @@ class VideoProcessor:
             else:
                 total_frames = self._get_frame_number(duration, fps)
         except Exception as e:
-            print(f"Warning: Could not get total frames, using fallback calculation: {e}")
+            self.log(f"Warning: Could not get total frames, using fallback calculation: {e}")
             # Fallback: use video file info
             try:
                 import cv2
@@ -202,7 +233,7 @@ class VideoProcessor:
             'scenes': scenes
         }
 
-        print(f"Detected {len(scenes)} scenes in video")
+        self.log(f"✓ Detected {len(scenes)} scenes in video")
         return scene_data
 
     def _save_scene_data(self, scene_data: Dict[str, Any], scene_data_path: Path, video_path: Path):
@@ -210,9 +241,9 @@ class VideoProcessor:
         try:
             with open(scene_data_path, 'w', encoding='utf-8') as f:
                 yaml.safe_dump(scene_data, f, default_flow_style=False, allow_unicode=True)
-            print(f"Saved scene data to: {scene_data_path}")
+            self.log(f"Saved scene data to: {scene_data_path}")
         except Exception as e:
-            print(f"Warning: Could not save scene data: {e}")
+            self.log(f"Warning: Could not save scene data: {e}")
 
     def _load_scene_data(self, scene_data_path: Path, video_path: Path) -> Dict[str, Any]:
         """Load and validate cached scene detection data."""
@@ -241,6 +272,9 @@ class VideoProcessor:
     ) -> List[str]:
         """Extract frames from detected scenes."""
         extracted_frames = []
+        total_scenes = len(scenes)
+
+        self.log(f"Extracting {frames_per_scene} frame(s) per scene from {total_scenes} scenes")
 
         # Open video with OpenCV
         cap = cv2.VideoCapture(str(video_path))
@@ -248,10 +282,14 @@ class VideoProcessor:
             raise RuntimeError(f"Could not open video file: {video_path}")
 
         try:
-            for scene in scenes:
+            for scene_idx, scene in enumerate(scenes):
                 scene_num = scene['scene_number']
                 start_frame = scene['start_frame']
                 end_frame = scene['end_frame']
+
+                # Update progress for each scene
+                progress = int((scene_idx / total_scenes) * 50) + 50  # 50-100% range
+                self.update_progress(progress, 100, f"Processing scene {scene_num}/{total_scenes}")
 
                 # Calculate frame positions to extract
                 frame_positions = self._calculate_frame_positions(
@@ -276,14 +314,14 @@ class VideoProcessor:
                         cv2.imwrite(str(frame_path), frame)
                         extracted_frames.append(str(frame_path))
 
-                        print(f"Extracted frame: {filename}")
+                        self.log(f"Extracted frame: {filename}")
                     else:
-                        print(f"Warning: Could not read frame at position {frame_pos}")
+                        self.log(f"Warning: Could not read frame at position {frame_pos}")
 
         finally:
             cap.release()
 
-        print(f"Extracted {len(extracted_frames)} frames from {len(scenes)} scenes")
+        self.log(f"✓ Extracted {len(extracted_frames)} frames from {len(scenes)} scenes")
         return extracted_frames
 
     def _calculate_frame_positions(

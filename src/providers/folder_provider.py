@@ -4,6 +4,7 @@ Folder provider for importing images and videos from local directories.
 
 import os
 import shutil
+import threading
 from pathlib import Path
 from typing import Dict, List, Any
 from .base_provider import BaseProvider
@@ -13,8 +14,8 @@ from ..utils.video_processor import VideoProcessor, is_video_file, get_supported
 class FolderProvider(BaseProvider):
     """Provider for importing images and videos from local folders."""
 
-    def __init__(self, character_name: str = None):
-        super().__init__(character_name)
+    def __init__(self, character_name: str = None, progress_callback=None, log_callback=None):
+        super().__init__(character_name, progress_callback, log_callback)
         self.video_processor = None
 
     def download(self, output_dir: str, **params) -> List[str]:
@@ -50,10 +51,12 @@ class FolderProvider(BaseProvider):
             try:
                 self.video_processor = VideoProcessor(
                     default_frames_per_scene=frames_per_scene,
-                    scene_threshold=scene_threshold
+                    scene_threshold=scene_threshold,
+                    progress_callback=self.progress_callback,
+                    log_callback=self.log_callback
                 )
             except ImportError as e:
-                print(f"Warning: Video processing not available: {e}")
+                self.log(f"Warning: Video processing not available: {e}")
                 process_videos = False
 
         processed_files = []
@@ -64,6 +67,8 @@ class FolderProvider(BaseProvider):
             # Get all image and video files from the folder
             source_folder = Path(folder_path)
             media_files = []
+
+            self.log(f"Scanning folder: {folder_path}")
 
             for file_path in source_folder.iterdir():
                 if file_path.is_file():
@@ -76,13 +81,23 @@ class FolderProvider(BaseProvider):
             # Sort files by name for consistent ordering
             media_files.sort(key=lambda x: x[1].name.lower())
 
+            self.log(f"Found {len(media_files)} media files to process")
+
             # Limit to max_count if specified
             if max_count > 0:
                 media_files = media_files[:max_count]
+                self.log(f"Limited to {len(media_files)} files (max_count: {max_count})")
 
             # Process each media file
+            total_files = len(media_files)
             for i, (file_type, source_file) in enumerate(media_files):
                 try:
+                    # Update progress
+                    if self.progress_callback:
+                        self.progress_callback(i, total_files, f"Processing {source_file.name}")
+
+                    self.log(f"Processing {file_type}: {source_file.name}")
+
                     if file_type == 'image':
                         processed_files.extend(self._process_image_file(
                             source_file, output_dir, preserve_names, i
@@ -93,17 +108,21 @@ class FolderProvider(BaseProvider):
                         ))
 
                 except Exception as e:
-                    print(f"Error processing file {source_file}: {e}")
+                    self.log(f"Error processing file {source_file}: {e}")
                     continue
 
+            # Final progress update
+            if self.progress_callback:
+                self.progress_callback(total_files, total_files, "Processing complete")
+
         except Exception as e:
-            print(f"Error processing folder {folder_path}: {e}")
+            self.log(f"Error processing folder {folder_path}: {e}")
 
         # Update history with processed items
         item_ids = [os.path.basename(f) for f in processed_files]
         self.update_history(item_ids)
 
-        print(f"Successfully processed {len(processed_files)} files from folder")
+        self.log(f"Successfully processed {len(processed_files)} files from folder")
         return processed_files
 
     def _process_image_file(self, source_file: Path, output_dir: str, preserve_names: bool, index: int) -> List[str]:
@@ -113,7 +132,7 @@ class FolderProvider(BaseProvider):
         # Check if this file was already imported
         source_filename = source_file.name
         if self.is_duplicate(source_filename, output_dir):
-            print(f"Skipping already imported file: {source_filename}")
+            self.log(f"Skipping already imported file: {source_filename}")
             return processed_files
 
         if preserve_names:
@@ -139,7 +158,7 @@ class FolderProvider(BaseProvider):
         # Copy the file
         shutil.copy2(source_file, output_path)
         processed_files.append(output_path)
-        print(f"Copied image: {source_file.name} -> {filename}")
+        self.log(f"Copied image: {source_file.name} -> {filename}")
 
         return processed_files
 
@@ -148,7 +167,7 @@ class FolderProvider(BaseProvider):
         processed_files = []
 
         if not self.video_processor:
-            print(f"Skipping video file (video processing not available): {source_file.name}")
+            self.log(f"Skipping video file (video processing not available): {source_file.name}")
             return processed_files
 
         # Check if this video was already processed by looking for existing frames
@@ -156,19 +175,19 @@ class FolderProvider(BaseProvider):
         existing_frames = [f for f in os.listdir(output_dir) if f.startswith(f"{video_stem}_scene_")]
 
         if existing_frames:
-            print(f"Skipping already processed video: {source_file.name}")
+            self.log(f"Skipping already processed video: {source_file.name}")
             return [os.path.join(output_dir, f) for f in existing_frames]
 
         try:
-            print(f"Processing video: {source_file.name}")
+            self.log(f"Processing video: {source_file.name}")
             extracted_frames = self.video_processor.extract_frames_from_video(
                 str(source_file), output_dir, frames_per_scene
             )
             processed_files.extend(extracted_frames)
-            print(f"Extracted {len(extracted_frames)} frames from video: {source_file.name}")
+            self.log(f"Extracted {len(extracted_frames)} frames from video: {source_file.name}")
 
         except Exception as e:
-            print(f"Error processing video {source_file.name}: {e}")
+            self.log(f"Error processing video {source_file.name}: {e}")
 
         return processed_files
 

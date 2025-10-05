@@ -23,8 +23,8 @@ except ImportError:
 class YoutubeProvider(BaseProvider):
     """Provider for downloading videos from YouTube and extracting frames."""
 
-    def __init__(self, character_name: str = None):
-        super().__init__(character_name)
+    def __init__(self, character_name: str = None, progress_callback=None, log_callback=None):
+        super().__init__(character_name, progress_callback, log_callback)
         self.video_processor = None
 
     def download(self, output_dir: str, **params) -> List[str]:

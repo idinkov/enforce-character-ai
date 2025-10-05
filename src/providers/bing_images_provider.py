@@ -19,8 +19,8 @@ except ImportError:
 class BingImagesProvider(BaseProvider):
     """Provider for downloading images from Bing Images."""
 
-    def __init__(self, character_name: str = None):
-        super().__init__(character_name)
+    def __init__(self, character_name: str = None, progress_callback=None, log_callback=None):
+        super().__init__(character_name, progress_callback, log_callback)
 
     def download(self, output_dir: str, **params) -> List[str]:
         """Download images from Bing Images."""

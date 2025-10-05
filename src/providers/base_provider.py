@@ -13,12 +13,26 @@ from ..config.app_config import PROVIDER_IMPORTS_DIR
 class BaseProvider(ABC):
     """Base class for all media providers."""
 
-    def __init__(self, character_name: str = None):
+    def __init__(self, character_name: str = None, progress_callback=None, log_callback=None):
         self.character_name = character_name
         self.provider_type = self.__class__.__name__.lower().replace('provider', '')
         self.history = []
         self.last_checked = None
         self.provider_id = None  # Will be set when saving/loading config
+        self.progress_callback = progress_callback
+        self.log_callback = log_callback
+
+    def log(self, message: str):
+        """Log a message if log callback is available."""
+        if self.log_callback:
+            self.log_callback(message)
+        else:
+            print(message)
+
+    def update_progress(self, current: int, total: int, message: str = ""):
+        """Update progress if progress callback is available."""
+        if self.progress_callback:
+            self.progress_callback(current, total, message)
 
     @abstractmethod
     def download(self, output_dir: str, **params) -> List[str]:

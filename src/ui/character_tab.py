@@ -37,7 +37,7 @@ class CharacterTab:
 
         # Create the tab
         self.frame = ttk.Frame(parent_notebook)
-        parent_notebook.add(self.frame, text="Characters")
+        parent_notebook.add(self.frame, text="1.Characters")
 
         self._create_widgets()
         self._load_characters()

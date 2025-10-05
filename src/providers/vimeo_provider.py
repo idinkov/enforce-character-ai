@@ -21,8 +21,8 @@ except ImportError:
 class VimeoProvider(BaseProvider):
     """Provider for downloading videos from Vimeo and extracting frames."""
 
-    def __init__(self, character_name: str = None):
-        super().__init__(character_name)
+    def __init__(self, character_name: str = None, progress_callback=None, log_callback=None):
+        super().__init__(character_name, progress_callback, log_callback)
         # You'll need to get API credentials from Vimeo
         self.client_id = "your_vimeo_client_id"
         self.client_secret = "your_vimeo_client_secret"

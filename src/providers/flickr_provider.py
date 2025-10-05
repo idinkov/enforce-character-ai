@@ -20,8 +20,8 @@ except ImportError:
 class FlickrProvider(BaseProvider):
     """Provider for downloading images from Flickr."""
 
-    def __init__(self, character_name: str = None):
-        super().__init__(character_name)
+    def __init__(self, character_name: str = None, progress_callback=None, log_callback=None):
+        super().__init__(character_name, progress_callback, log_callback)
         # You'll need to get API keys from Flickr
         self.api_key = "your_flickr_api_key"
         self.api_secret = "your_flickr_api_secret"
