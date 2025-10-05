@@ -18,14 +18,13 @@ Enforce Character AI is a comprehensive desktop application for managing, proces
 
 ## Changelog
 
-### Version 0.1.1 (?)
+### Version 0.1.1 (05.10.2025)
 - Add auto installing of pytorch with CUDA support if GPU is available.
 - Cropping face image now rotates the face to be straight, and crops more area to include the entire head.
 - Added start.bat and start.sh which installs and launches the app.
 - Improve Providers tab to support progress tracking of the import and to not freeze the app on scene detection.
 - Fix YouTube provider to work.
 - Make requirements.txt strict and update to latest packages.
-- Implement Real-ESRGAN for upscaling instead of GFPGAN when Automatic GFPGAN is enabled & enable automatic upscale.
 
 ### Version 0.1.0 (23.09.2025)
 - Initial version.

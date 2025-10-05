@@ -1,12 +1,10 @@
 # Planned Tasks and Features
 
-Fixes for 0.1.1:
-1. ✅ **COMPLETED**: When Automatic GFPGAN is enabled, it upscales only the faces. Switch to Real-ESRGAN.
-2. Fix progress tracking inside training queue tab. Also automatically show when training has started and hide the messagebox for success.
-
 Fixes for 0.1.2:
 1. Improve the speed of character selection tab.
 2. Make training dialogue appear instantly when user clicks Train button instead of waiting for the OneTrainer check. It should be done inside the Training Queue Manager.
+3. Implement Real-ESRGAN for upscaling instead of GFPGAN when Automatic GFPGAN is enabled & enable automatic upscale.
+4. Fix progress tracking inside training queue tab. Also automatically show when training has started and hide the messagebox for success.
 
 Fixes for 0.1.3:
 1. Improve the embedded scene detector with more adequate options, and use our custom C++ fast scene detector from -> https://github.com/idinkov/cuda-scene-detection
@@ -30,9 +28,6 @@ Make relationships between images and stages:
 -> Image Viewer will be able to see the image between stages and see the history of the image.
 -> Images Tab will be able to filter images within certain selected stage, how far they have gone in the pipeline, and sort by that.
 -> In Images Tab you will be easily able to see which images didn't go to next stage and why (e.g., failed quality checks, deleted by user, automatic filtering, etc.)
-
-Create Archives:
--> Allow users to create ZIP or TAR.GZ archives of characters. It will include all of the character files inside the character folder.
 
 To Reasearch:
 -> https://github.com/DavidDinkevich/Story2Board 
