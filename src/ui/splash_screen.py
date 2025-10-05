@@ -157,6 +157,48 @@ class SplashScreen:
             self.splash.destroy()
             self.splash = None
 
+    def _restart_application(self):
+        """Restart the application to reinitialize PyTorch with GPU support."""
+        try:
+            import time
+
+            # Show a message to the user
+            self.update_progress(100, "Restarting application in 2 seconds...")
+            time.sleep(2)
+
+            # Close splash screen
+            if self.splash:
+                self.splash.quit()
+
+            # Restart the application using the same Python executable and script
+            import subprocess
+
+            # Get the main script path (main.py)
+            main_script = Path(__file__).parent.parent.parent / "main.py"
+
+            print(f"Restarting application: {sys.executable} {main_script}")
+
+            # Start new instance
+            if os.name == 'nt':  # Windows
+                # Use pythonw.exe to avoid console window if available
+                python_exe = sys.executable.replace('python.exe', 'pythonw.exe')
+                if not Path(python_exe).exists():
+                    python_exe = sys.executable
+                subprocess.Popen([python_exe, str(main_script)],
+                               creationflags=subprocess.CREATE_NEW_PROCESS_GROUP)
+            else:  # Unix-like
+                subprocess.Popen([sys.executable, str(main_script)])
+
+            # Exit current instance
+            sys.exit(0)
+
+        except Exception as e:
+            print(f"Error restarting application: {e}")
+            import traceback
+            traceback.print_exc()
+            # If restart fails, continue with current instance
+            self.update_progress(self.current_progress, "Restart failed, continuing with current session...")
+
     def run_startup_sequence(self, on_complete_callback=None, on_error_callback=None):
         """Run the startup sequence in a separate thread."""
         def startup_thread():
@@ -218,9 +260,17 @@ class SplashScreen:
 
             # Step 1: Install PyTorch first with specific CUDA version
             self.update_progress(self.current_progress, "Installing PyTorch with CUDA 12.8...")
-            if not installer.install_pytorch(version="2.8.0", cuda_version="cu128"):
+            pytorch_success, needs_restart = installer.install_pytorch(version="2.8.0", cuda_version="cu128")
+
+            if not pytorch_success:
                 print("PyTorch installation failed, but continuing...")
                 self.update_progress(self.current_progress, "PyTorch installation failed, continuing...")
+            elif needs_restart:
+                # PyTorch was installed/upgraded, need to restart the application
+                print("PyTorch installed successfully. Application restart required.")
+                self.update_progress(self.current_progress, "PyTorch installed! Restarting application...")
+                self._restart_application()
+                return False  # Stop further initialization
 
             # Step 2: Install other requirements
             self.update_progress(self.current_progress, "Installing other packages...")

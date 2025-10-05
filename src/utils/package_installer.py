@@ -79,7 +79,9 @@ class PackageInstaller:
             cuda_version: CUDA version (e.g., 'cu128' for CUDA 12.8)
 
         Returns:
-            bool: True if installation succeeded
+            tuple: (success: bool, needs_restart: bool)
+                  - success: True if installation succeeded or already installed
+                  - needs_restart: True if PyTorch was installed/upgraded and app needs restart
         """
         try:
             self._update_progress(0, "Checking PyTorch installation...")
@@ -92,7 +94,7 @@ class PackageInstaller:
                     if has_cuda:
                         self._update_progress(100, f"PyTorch {current_version} with CUDA already installed!")
                         print(f"PyTorch {current_version} with CUDA support already installed, skipping...")
-                        return True
+                        return (True, False)  # Already installed, no restart needed
                     else:
                         # CPU version found, need to reinstall GPU version
                         self._update_progress(0, f"PyTorch {current_version} (CPU-only) found, installing GPU version...")
@@ -107,13 +109,16 @@ class PackageInstaller:
                 print("PyTorch not installed, proceeding with installation...")
 
             # Install PyTorch with CUDA support
-            return self._install_pytorch_with_cuda(version, cuda_version, needs_reinstall)
+            install_success = self._install_pytorch_with_cuda(version, cuda_version, needs_reinstall)
+
+            # If installation succeeded, we need to restart to reinitialize PyTorch
+            return (install_success, install_success)
 
         except Exception as e:
             error_msg = f"Error installing PyTorch: {e}"
             print(error_msg)
             self._update_progress(0, f"PyTorch installation error: {str(e)[:50]}...")
-            return False
+            return (False, False)
 
     def _uninstall_pytorch(self):
         """Uninstall existing PyTorch packages."""
