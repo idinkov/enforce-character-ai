@@ -1,6 +1,6 @@
-# Enforce Character AI 0.1.0
+# Enforce Character AI 0.1.1
 
-![App Screenshot](docs/images/app.png)
+<img src="docs/images/app.png" alt="App Screenshot" width="512" height="512" />
 
 ## Overview
 
@@ -97,6 +97,14 @@ Each stage is implemented as a processor in `src/processors/` and can be extende
 
 Contributions are welcome! Please open issues or submit pull requests for bug fixes, new features, or improvements.
 
+## Changelog
+
+### Version 0.1.1 (?)
+- Add auto installing of pytorch with CUDA support if GPU is available.
+
+### Version 0.1.0 (23.09.2025)
+- Initial version.
+
 ## License
 
 [MIT License](LICENSE)
@@ -105,6 +113,7 @@ Contributions are welcome! Please open issues or submit pull requests for bug fi
 
 - [Tkinter](https://docs.python.org/3/library/tkinter.html) for GUI
 - [GFPGAN](https://github.com/TencentARC/GFPGAN), [U2Net](https://github.com/xuebinqin/U-2-Net), [YOLO](https://github.com/ultralytics/yolov5), [Stable Diffusion](https://github.com/CompVis/stable-diffusion) for model support
+- [OneTrainer](https://github.com/Nerogar/OneTrainer) for training support
 
 ---
 
