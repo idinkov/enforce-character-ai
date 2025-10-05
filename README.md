@@ -101,6 +101,7 @@ Contributions are welcome! Please open issues or submit pull requests for bug fi
 
 ### Version 0.1.1 (?)
 - Add auto installing of pytorch with CUDA support if GPU is available.
+- Cropping face image now rotates the face to be straight, and crops more area to include the entire head.
 
 ### Version 0.1.0 (23.09.2025)
 - Initial version.

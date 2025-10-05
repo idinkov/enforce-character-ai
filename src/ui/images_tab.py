@@ -652,11 +652,15 @@ class ImagesTab:
             face_output_path = character_path / "face.png"
             status_callback("Cropping and saving face image...")
 
+            # Extract landmarks if available
+            landmarks = selected_face.get('landmarks', None)
+
             success = FaceProcessor.crop_and_save_face(
                 image_path=selected_image_path,
                 face=selected_face,
                 output_path=face_output_path,
                 max_size=1024,
+                landmarks=landmarks,
                 status_callback=status_callback
             )
 

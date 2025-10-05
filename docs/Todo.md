@@ -3,11 +3,8 @@
 Fixes for 0.1.1:
 1. Improve provider to support progress tracking of the import. Implement in stage 0 to 1.
 2. When Automatic GFPGAN is enabled, it upscales only the faces.
-3. When cropping face image, rotate the face to be straight, and also crop around 20% more area, like the entire head.
-4. Fix progress tracking inside training queue tab. Also automatically show when training has started and hide the messagebox for success.
-5. Add requirements-cpu.txt and requirements-gpu.txt to separate CPU and GPU dependencies.
-6. Make install.bat and install.sh which will install requirements-cpu.txt by default and if user wants to install GPU version they can run install-gpu.bat or install-gpu.sh
-7. Add auto installing of pytorch with CUDA support if GPU is available.
+3. Fix progress tracking inside training queue tab. Also automatically show when training has started and hide the messagebox for success.
+4. Make install.bat and install.sh which should install python 3.10 if not available, will make .venv from it, and make pip install -r requirements.txt
 
 Fixes for 0.1.2:
 1. Improve the speed of character selection tab.
