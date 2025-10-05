@@ -208,6 +208,14 @@ class SplashScreen:
         """Install or update requirements from requirements.txt."""
         try:
             requirements_path = Path(__file__).parent.parent.parent / "requirements.txt"
+
+            # Step 1: Install PyTorch first with specific CUDA version
+            self.update_progress(self.current_progress, "Installing PyTorch with CUDA 12.8...")
+            if not self._install_pytorch():
+                print("PyTorch installation failed, but continuing...")
+                self.update_progress(self.current_progress, "PyTorch installation failed, continuing...")
+
+            # Step 2: Install other requirements
             if requirements_path.exists():
                 self.update_progress(self.current_progress, "Installing packages...")
 
@@ -341,6 +349,157 @@ class SplashScreen:
             error_msg = f"Error installing requirements: {e}"
             print(error_msg)
             self.update_progress(self.current_progress, f"Installation error: {str(e)[:50]}...")
+            return False
+
+    def _install_pytorch(self):
+        """Install PyTorch 2.8.0 with CUDA 12.8 support."""
+        try:
+            self.update_progress(self.current_progress, "Checking PyTorch installation...")
+
+            # Check if PyTorch is already installed with correct version
+            try:
+                import torch
+                current_version = torch.__version__
+                if current_version.startswith("2.8.0"):
+                    self.update_progress(self.current_progress, f"PyTorch {current_version} already installed!")
+                    print(f"PyTorch {current_version} already installed, skipping...")
+                    return True
+                else:
+                    self.update_progress(self.current_progress, f"PyTorch {current_version} found, upgrading to 2.8.0...")
+                    print(f"PyTorch {current_version} found, upgrading to 2.8.0...")
+            except ImportError:
+                self.update_progress(self.current_progress, "PyTorch not found, installing...")
+                print("PyTorch not installed, proceeding with installation...")
+
+            # Get the current environment's pip executable
+            pip_executable = [sys.executable, "-m", "pip"]
+
+            # Install PyTorch with CUDA 12.8 support
+            self.update_progress(self.current_progress, "Installing PyTorch 2.8.0 with CUDA 12.8...")
+
+            cmd = pip_executable + [
+                "install",
+                "torch==2.8.0",
+                "torchvision",
+                "torchaudio",
+                "--index-url",
+                "https://download.pytorch.org/whl/test/cu128"
+            ]
+
+            print(f"Running PyTorch installation command: {' '.join(cmd)}")
+
+            process = subprocess.Popen(
+                cmd,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.STDOUT,
+                universal_newlines=True,
+                bufsize=1  # Line buffered
+            )
+
+            # Monitor the process and show real-time output
+            install_log = []
+            current_package = ""
+
+            while True:
+                if self.cancel_flag:
+                    process.terminate()
+                    return False
+
+                line = process.stdout.readline()
+                if line == '' and process.poll() is not None:
+                    break
+
+                if line:
+                    line = line.strip()
+                    install_log.append(line)
+
+                    # Extract package name from pip output
+                    if "Collecting" in line:
+                        try:
+                            current_package = line.split("Collecting ")[1].split(">=")[0].split("==")[0].split("[")[0]
+                            self.update_progress(
+                                self.current_progress,
+                                f"Collecting {current_package}..."
+                            )
+                        except:
+                            pass
+                    elif "Downloading" in line:
+                        # Show download progress for large PyTorch packages
+                        if "MB" in line or "GB" in line:
+                            try:
+                                # Extract size information
+                                self.update_progress(
+                                    self.current_progress,
+                                    f"Downloading PyTorch package..."
+                                )
+                            except:
+                                pass
+                    elif "Installing collected packages:" in line:
+                        self.update_progress(
+                            self.current_progress,
+                            "Installing PyTorch packages..."
+                        )
+                    elif "Successfully installed" in line:
+                        packages = line.replace("Successfully installed ", "").split()
+                        if packages:
+                            self.update_progress(
+                                self.current_progress,
+                                f"Successfully installed PyTorch and dependencies!"
+                            )
+                    elif "Requirement already satisfied:" in line:
+                        try:
+                            package = line.split("Requirement already satisfied: ")[1].split(" in")[0]
+                            self.update_progress(
+                                self.current_progress,
+                                f"Already satisfied: {package}"
+                            )
+                        except:
+                            pass
+                    elif "Building wheel for" in line:
+                        try:
+                            package = line.split("Building wheel for ")[1].split(" (")[0]
+                            self.update_progress(
+                                self.current_progress,
+                                f"Building wheel for {package}..."
+                            )
+                        except:
+                            pass
+                    elif "ERROR:" in line or "FAILED:" in line:
+                        self.update_progress(
+                            self.current_progress,
+                            f"Error: {line[:50]}..."
+                        )
+                        print(f"PyTorch install error: {line}")
+
+                # Small delay to prevent UI freezing
+                time.sleep(0.01)
+
+            return_code = process.returncode
+
+            if return_code == 0:
+                self.update_progress(
+                    self.current_progress,
+                    "PyTorch installation completed successfully!"
+                )
+                print("PyTorch installation completed successfully")
+                return True
+            else:
+                self.update_progress(
+                    self.current_progress,
+                    f"PyTorch installation failed (exit code: {return_code})"
+                )
+                print(f"PyTorch installation failed with exit code: {return_code}")
+                # Print last few lines of log for debugging
+                if install_log:
+                    print("Last few lines of PyTorch install log:")
+                    for line in install_log[-10:]:
+                        print(f"  {line}")
+                return False
+
+        except Exception as e:
+            error_msg = f"Error installing PyTorch: {e}"
+            print(error_msg)
+            self.update_progress(self.current_progress, f"PyTorch installation error: {str(e)[:50]}...")
             return False
 
     def _download_models(self):
