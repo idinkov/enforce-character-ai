@@ -37,15 +37,22 @@ requirements.txt      # Python dependencies
 
 ## Getting Started
 
-### Prerequisites
+### Installation (Automatic)
+1. Run the provided installation script:
+   - On Windows: `start.bat`
+   - On Linux/MacOS: `start.sh`
+   
+   This will set up a virtual environment, install dependencies, and download necessary models.
+
+
+### Prerequisites (Manual Installation)
 - Python 3.10+
 - Required Python packages (see `requirements.txt`)
-- Pretrained model files in `models/` (see below)
 
-### Installation
+### Installation (Manual Installation)
 1. Clone the repository:
    ```
-   git clone <repo-url>
+   git clone https://github.com/idinkov/enforce-character-ai.git
    cd enforce-character-ai
    ```
 2. Install dependencies:
@@ -102,6 +109,7 @@ Contributions are welcome! Please open issues or submit pull requests for bug fi
 ### Version 0.1.1 (?)
 - Add auto installing of pytorch with CUDA support if GPU is available.
 - Cropping face image now rotates the face to be straight, and crops more area to include the entire head.
+- Added install.bat and install.sh which installs and launches the app.
 
 ### Version 0.1.0 (23.09.2025)
 - Initial version.
