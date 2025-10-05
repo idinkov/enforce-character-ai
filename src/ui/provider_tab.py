@@ -2,9 +2,11 @@
 Provider management tab UI component.
 """
 import tkinter as tk
-from tkinter import ttk, messagebox
+from tkinter import ttk, messagebox, filedialog
 from typing import Optional
 import os
+import datetime
+import threading
 
 
 class ProviderTab:
@@ -18,7 +20,7 @@ class ProviderTab:
 
         # Create the tab
         self.frame = ttk.Frame(parent_notebook)
-        parent_notebook.add(self.frame, text="Providers")
+        parent_notebook.add(self.frame, text="2.Providers")
 
         self._create_widgets()
 
@@ -38,6 +40,9 @@ class ProviderTab:
         # Current providers list
         self._create_providers_list_section()
 
+        # Progress and log display
+        self._create_progress_log_section()
+
     def _create_minimal_add_section(self):
         """Create minimal URL input and Add button section."""
         add_frame = ttk.LabelFrame(self.frame, text="Add Provider")
@@ -47,11 +52,12 @@ class ProviderTab:
         url_input_frame = ttk.Frame(add_frame)
         url_input_frame.pack(fill="x", padx=5, pady=5)
 
-        ttk.Label(url_input_frame, text="URL:").pack(side="left")
+        ttk.Label(url_input_frame, text="URL or Folder:").pack(side="left")
         self.provider_url_var = tk.StringVar()
         self.provider_url_entry = ttk.Entry(url_input_frame, textvariable=self.provider_url_var, width=60)
         self.provider_url_entry.pack(side="left", fill="x", expand=True, padx=5)
 
+        ttk.Button(url_input_frame, text="Browse", command=self._select_folder).pack(side="left", padx=2)
         ttk.Button(url_input_frame, text="Add", command=self._add_provider_from_url).pack(side="left", padx=5)
 
         # Status/result display
@@ -112,6 +118,7 @@ class ProviderTab:
         try:
             self.add_status_label.config(foreground="blue")
             self.add_status_var.set("Detecting provider...")
+            self._log_message(f"Detecting provider for URL: {url}")
             self.frame.update()
 
             # Use provider manager to detect provider
@@ -121,6 +128,7 @@ class ProviderTab:
                 params = provider_info.get('params', {})
 
                 self.add_status_var.set(f"Detected {provider_type}, adding...")
+                self._log_message(f"Detected {provider_type} provider, adding...")
                 self.frame.update()
 
                 # Construct full character directory path
@@ -130,24 +138,30 @@ class ProviderTab:
                 success = self.provider_manager.add_provider_to_character(
                     character_dir, provider_type, params,
                     download_now=True,
-                    auto_check=True
+                    auto_check=True,
+                    progress_callback=self._update_progress,
+                    log_callback=self._log_message
                 )
 
                 if success:
                     self.add_status_label.config(foreground="green")
                     self.add_status_var.set(f"Successfully added {provider_type} provider")
+                    self._log_message(f"Successfully added {provider_type} provider")
                     self._load_character_providers()
                     # Clear the URL field
                     self.provider_url_var.set("")
                 else:
                     self.add_status_label.config(foreground="red")
                     self.add_status_var.set("Failed to add provider")
+                    self._log_message("Failed to add provider")
             else:
                 self.add_status_label.config(foreground="red")
                 self.add_status_var.set("No provider detected for this URL/path")
+                self._log_message("No provider detected for this URL/path")
         except Exception as e:
             self.add_status_label.config(foreground="red")
             self.add_status_var.set(f"Error: {str(e)}")
+            self._log_message(f"Error adding provider: {str(e)}")
             messagebox.showerror("Error", f"Failed to add provider: {e}")
 
     def _load_character_providers(self):
@@ -169,7 +183,7 @@ class ProviderTab:
             print(f"Error loading providers: {e}")
 
     def _check_provider_now(self):
-        """Check selected provider now."""
+        """Check selected provider now using threaded operation to prevent UI freezing."""
         selection = self.providers_listbox.curselection()
         if not selection:
             messagebox.showwarning("Warning", "Please select a provider to check")
@@ -177,35 +191,78 @@ class ProviderTab:
 
         provider_index = selection[0]
         try:
+            # Reset progress and start logging
+            self._update_progress(0, 1, "Starting provider check...")
+            self._log_message("Starting threaded provider check...")
+
+            # Disable buttons during operation
+            self.check_now_button.config(state="disabled")
+            self.check_all_button.config(state="disabled")
+
             # Construct full character directory path
             character_dir = os.path.join(self.characters_path, self.current_character)
             providers = self.provider_manager.get_character_providers(character_dir)
 
             if provider_index >= len(providers):
                 messagebox.showerror("Error", "Invalid provider selection")
+                self._enable_buttons()
                 return
 
             provider_config = providers[provider_index]
             provider_id = provider_config.get('id')
+            provider_type = provider_config.get('type', 'unknown')
 
             if not provider_id:
                 messagebox.showerror("Error", "Provider ID not found")
+                self._enable_buttons()
                 return
 
-            downloaded_count = self.provider_manager.check_provider_now(character_dir, provider_id)
+            self._log_message(f"Checking {provider_type} provider (ID: {provider_id})")
 
-            # check_provider_now returns number of files downloaded, not boolean success
-            if downloaded_count >= 0:  # Any non-negative number means success
-                if downloaded_count > 0:
-                    messagebox.showinfo("Success", f"Provider check completed successfully!\n{downloaded_count} new files downloaded.")
-                else:
-                    messagebox.showinfo("Success", "Provider check completed successfully!\nNo new files found.")
-                # Refresh the provider list to show updated info
-                self._load_character_providers()
-            else:
-                messagebox.showerror("Error", "Provider check failed")
+            def completion_callback(result):
+                """Called when the threaded operation completes"""
+                def ui_update():
+                    if result >= 0:  # Success
+                        self._update_progress(1, 1, "Complete")
+                        if result > 0:
+                            self._log_message(f"✓ Provider check completed successfully! {result} new files downloaded.")
+                            messagebox.showinfo("Success", f"Provider check completed successfully!\n{result} new files downloaded.")
+                        else:
+                            self._log_message("✓ Provider check completed successfully! No new files found.")
+                            messagebox.showinfo("Success", "Provider check completed successfully!\nNo new files found.")
+                        # Refresh the provider list to show updated info
+                        self._load_character_providers()
+                    else:  # Error
+                        self._update_progress(0, 1, "Failed")
+                        self._log_message("✗ Provider check failed")
+                        messagebox.showerror("Error", "Provider check failed")
+
+                    # Re-enable buttons
+                    self._enable_buttons()
+
+                # Schedule UI update on main thread
+                self.frame.after(0, ui_update)
+
+            # Start threaded operation
+            self.provider_manager.check_provider_now_threaded(
+                character_dir, provider_id,
+                progress_callback=self._update_progress,
+                log_callback=self._log_message,
+                completion_callback=completion_callback
+            )
+
         except Exception as e:
+            self._update_progress(0, 1, "Error")
+            self._log_message(f"✗ Error checking provider: {str(e)}")
             messagebox.showerror("Error", f"Failed to check provider: {e}")
+            self._enable_buttons()
+
+    def _enable_buttons(self):
+        """Re-enable provider operation buttons."""
+        selection = self.providers_listbox.curselection()
+        if selection:
+            self.check_now_button.config(state="normal")
+        self.check_all_button.config(state="normal")
 
     def _remove_provider(self):
         """Remove selected provider."""
@@ -250,30 +307,196 @@ class ProviderTab:
             self.check_now_button.config(state="disabled")
 
     def _check_all_providers(self):
-        """Check all providers for the current character."""
+        """Check all providers for the current character using threaded operations."""
         if not self.current_character:
             messagebox.showwarning("Warning", "Please select a character first")
             return
 
         try:
+            # Reset progress and start logging
+            self._update_progress(0, 1, "Starting provider checks...")
+            self._log_message("Starting threaded check for all providers...")
+
+            # Disable buttons during operation
+            self.check_now_button.config(state="disabled")
+            self.check_all_button.config(state="disabled")
+
             # Construct full character directory path
             character_dir = os.path.join(self.characters_path, self.current_character)
             providers = self.provider_manager.get_character_providers(character_dir)
 
-            total_downloaded = 0
-            for provider_config in providers:
-                provider_id = provider_config.get('id')
-                if provider_id:
-                    downloaded_count = self.provider_manager.check_provider_now(character_dir, provider_id)
-                    if downloaded_count >= 0:
-                        total_downloaded += downloaded_count
+            if not providers:
+                self._log_message("No providers configured for this character")
+                messagebox.showinfo("Info", "No providers configured for this character")
+                self._enable_buttons()
+                return
 
-            if total_downloaded > 0:
-                messagebox.showinfo("Success", f"Checked all providers successfully! {total_downloaded} new files downloaded.")
-            else:
-                messagebox.showinfo("Success", "Checked all providers successfully! No new files found.")
+            def run_all_checks():
+                """Run all provider checks in background thread"""
+                try:
+                    total_downloaded = 0
+                    total_providers = len(providers)
 
-            # Refresh the provider list to show updated info
-            self._load_character_providers()
+                    self._log_message(f"Found {total_providers} provider(s) to check")
+
+                    for i, provider_config in enumerate(providers):
+                        provider_id = provider_config.get('id')
+                        provider_type = provider_config.get('type', 'unknown')
+
+                        if provider_id:
+                            # Update progress for current provider
+                            def update_progress():
+                                self._update_progress(i, total_providers, f"Checking {provider_type}")
+                            self.frame.after(0, update_progress)
+
+                            def log_current():
+                                self._log_message(f"Checking provider {i+1}/{total_providers}: {provider_type} (ID: {provider_id})")
+                            self.frame.after(0, log_current)
+
+                            downloaded_count = self.provider_manager.check_provider_now(
+                                character_dir, provider_id,
+                                progress_callback=self._threaded_progress_callback,
+                                log_callback=self._threaded_log_callback
+                            )
+
+                            if downloaded_count >= 0:
+                                total_downloaded += downloaded_count
+                                if downloaded_count > 0:
+                                    def log_success():
+                                        self._log_message(f"✓ Downloaded {downloaded_count} new files from {provider_type}")
+                                    self.frame.after(0, log_success)
+                                else:
+                                    def log_no_files():
+                                        self._log_message(f"✓ No new files found from {provider_type}")
+                                    self.frame.after(0, log_no_files)
+                            else:
+                                def log_failure():
+                                    self._log_message(f"✗ Failed to check provider: {provider_type}")
+                                self.frame.after(0, log_failure)
+
+                    # Final completion on UI thread
+                    def completion():
+                        self._update_progress(total_providers, total_providers, "Complete")
+
+                        if total_downloaded > 0:
+                            self._log_message(f"✓ All providers checked! Total new files downloaded: {total_downloaded}")
+                            messagebox.showinfo("Success", f"Checked all providers successfully! {total_downloaded} new files downloaded.")
+                        else:
+                            self._log_message("✓ All providers checked! No new files found.")
+                            messagebox.showinfo("Success", "Checked all providers successfully! No new files found.")
+
+                        # Refresh the provider list to show updated info
+                        self._load_character_providers()
+                        self._enable_buttons()
+
+                    self.frame.after(0, completion)
+
+                except Exception as e:
+                    def error_handler():
+                        self._update_progress(0, 1, "Error")
+                        self._log_message(f"✗ Error checking providers: {str(e)}")
+                        messagebox.showerror("Error", f"Failed to check providers: {e}")
+                        self._enable_buttons()
+
+                    self.frame.after(0, error_handler)
+
+            # Start background thread
+            thread = threading.Thread(target=run_all_checks, daemon=True)
+            thread.start()
+
         except Exception as e:
+            self._update_progress(0, 1, "Error")
+            self._log_message(f"✗ Error checking providers: {str(e)}")
             messagebox.showerror("Error", f"Failed to check providers: {e}")
+            self._enable_buttons()
+
+    def _threaded_progress_callback(self, current, total, message=""):
+        """Thread-safe progress callback that schedules UI updates on main thread"""
+        def update():
+            self._update_progress(current, total, message)
+        self.frame.after(0, update)
+
+    def _threaded_log_callback(self, message):
+        """Thread-safe log callback that schedules UI updates on main thread"""
+        def log():
+            self._log_message(message)
+        self.frame.after(0, log)
+
+    def _create_progress_log_section(self):
+        """Create the progress and log display section."""
+        progress_log_frame = ttk.LabelFrame(self.frame, text="Provider Activity")
+        progress_log_frame.pack(fill="both", expand=True, padx=10, pady=5)
+
+        # Progress bar
+        progress_frame = ttk.Frame(progress_log_frame)
+        progress_frame.pack(fill="x", padx=5, pady=5)
+
+        ttk.Label(progress_frame, text="Progress:").pack(side="left")
+        self.progress_var = tk.DoubleVar()
+        self.progress_bar = ttk.Progressbar(progress_frame, variable=self.progress_var,
+                                          maximum=100, length=300)
+        self.progress_bar.pack(side="left", fill="x", expand=True, padx=5)
+
+        self.progress_label = ttk.Label(progress_frame, text="Ready")
+        self.progress_label.pack(side="right")
+
+        # Log display
+        log_frame = ttk.Frame(progress_log_frame)
+        log_frame.pack(fill="both", expand=True, padx=5, pady=5)
+
+        # Create text widget with scrollbar
+        self.log_text = tk.Text(log_frame, height=8, wrap=tk.WORD, state=tk.DISABLED)
+        log_scrollbar = ttk.Scrollbar(log_frame, orient="vertical", command=self.log_text.yview)
+        self.log_text.config(yscrollcommand=log_scrollbar.set)
+
+        self.log_text.pack(side="left", fill="both", expand=True)
+        log_scrollbar.pack(side="right", fill="y")
+
+        # Clear log button
+        ttk.Button(progress_log_frame, text="Clear Log", command=self._clear_log).pack(pady=2)
+
+    def _clear_log(self):
+        """Clear the log display."""
+        self.log_text.config(state=tk.NORMAL)
+        self.log_text.delete(1.0, tk.END)
+        self.log_text.config(state=tk.DISABLED)
+
+    def _log_message(self, message: str):
+        """Add a message to the log display."""
+        timestamp = datetime.datetime.now().strftime("%H:%M:%S")
+        formatted_message = f"[{timestamp}] {message}\n"
+
+        self.log_text.config(state=tk.NORMAL)
+        self.log_text.insert(tk.END, formatted_message)
+        self.log_text.see(tk.END)  # Auto-scroll to bottom
+        self.log_text.config(state=tk.DISABLED)
+
+        # Update UI immediately
+        self.frame.update_idletasks()
+
+    def _update_progress(self, current: int, total: int, message: str = ""):
+        """Update the progress bar and label."""
+        if total > 0:
+            progress_percent = (current / total) * 100
+            self.progress_var.set(progress_percent)
+
+            if message:
+                self.progress_label.config(text=f"{current}/{total} - {message}")
+            else:
+                self.progress_label.config(text=f"{current}/{total}")
+        else:
+            self.progress_var.set(0)
+            self.progress_label.config(text=message or "Ready")
+
+        # Update UI immediately
+        self.frame.update_idletasks()
+
+    def _select_folder(self):
+        """Open folder dialog and automatically trigger add provider when folder is selected."""
+        folder_path = filedialog.askdirectory(title="Select Folder")
+        if folder_path:
+            # Set the selected folder path in the entry field
+            self.provider_url_var.set(folder_path)
+            # Automatically trigger the add provider functionality
+            self._add_provider_from_url()
+

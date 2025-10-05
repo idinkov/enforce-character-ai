@@ -212,7 +212,8 @@ class FaceDetection:
                         'height': height,
                         'center_x': center_x,
                         'center_y': center_y,
-                        'confidence': 1.0  # facexlib doesn't provide confidence scores directly
+                        'confidence': 1.0,  # facexlib doesn't provide confidence scores directly
+                        'landmarks': landmarks_np  # Include landmarks for face rotation
                     })
 
             # Clean up for next image

@@ -32,7 +32,7 @@ class ImagesTab:
 
         # Create the tab
         self.frame = ttk.Frame(parent_notebook)
-        parent_notebook.add(self.frame, text="Images")
+        parent_notebook.add(self.frame, text="3.Images")
 
         # Initialize processing status dialog
         self.processing_dialog = ProcessingStatusDialog(
@@ -652,11 +652,15 @@ class ImagesTab:
             face_output_path = character_path / "face.png"
             status_callback("Cropping and saving face image...")
 
+            # Extract landmarks if available
+            landmarks = selected_face.get('landmarks', None)
+
             success = FaceProcessor.crop_and_save_face(
                 image_path=selected_image_path,
                 face=selected_face,
                 output_path=face_output_path,
                 max_size=1024,
+                landmarks=landmarks,
                 status_callback=status_callback
             )
 

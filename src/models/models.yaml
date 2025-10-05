@@ -100,7 +100,7 @@ models:
     description: "Everclear PNY by Zovya V4 – photorealistic variant with improved faces and lighting"
     model_type: "text2img"
     framework: "diffusers"
-    required: true
+    required: false
     is_trainable: true
     train_suffix: "Everclear"
     # Hugging Face configuration

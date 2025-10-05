@@ -1,6 +1,6 @@
-# Enforce Character AI 0.1.0
+# Enforce Character AI 0.1.1
 
-![App Screenshot](docs/images/app.png)
+<img src="docs/images/app.png" alt="App" width="512" height="512" />
 
 ## Overview
 
@@ -15,6 +15,19 @@ Enforce Character AI is a comprehensive desktop application for managing, proces
 - **Progress Tracking:** Visualize processing progress for each character and stage.
 - **Splash Screen & Error Handling:** Professional startup experience and robust error reporting.
 - **Extensible Architecture:** Easily add new processing stages or providers.
+
+## Changelog
+
+### Version 0.1.1 (05.10.2025)
+- Add auto installing of pytorch with CUDA support if GPU is available.
+- Cropping face image now rotates the face to be straight, and crops more area to include the entire head.
+- Added start.bat and start.sh which installs and launches the app.
+- Improve Providers tab to support progress tracking of the import and to not freeze the app on scene detection.
+- Fix YouTube provider to work.
+- Make requirements.txt strict and update to latest packages.
+
+### Version 0.1.0 (23.09.2025)
+- Initial version.
 
 ## Folder Structure
 
@@ -37,15 +50,22 @@ requirements.txt      # Python dependencies
 
 ## Getting Started
 
-### Prerequisites
+### Installation (Automatic)
+1. Run the provided installation script:
+   - On Windows: `start.bat`
+   - On Linux/MacOS: `start.sh`
+   
+   This will set up a virtual environment, install dependencies, download necessary models, and launch the application.
+
+
+### Prerequisites (Manual Installation)
 - Python 3.10+
 - Required Python packages (see `requirements.txt`)
-- Pretrained model files in `models/` (see below)
 
-### Installation
+### Installation (Manual Installation)
 1. Clone the repository:
    ```
-   git clone <repo-url>
+   git clone https://github.com/idinkov/enforce-character-ai.git
    cd enforce-character-ai
    ```
 2. Install dependencies:
@@ -105,6 +125,7 @@ Contributions are welcome! Please open issues or submit pull requests for bug fi
 
 - [Tkinter](https://docs.python.org/3/library/tkinter.html) for GUI
 - [GFPGAN](https://github.com/TencentARC/GFPGAN), [U2Net](https://github.com/xuebinqin/U-2-Net), [YOLO](https://github.com/ultralytics/yolov5), [Stable Diffusion](https://github.com/CompVis/stable-diffusion) for model support
+- [OneTrainer](https://github.com/Nerogar/OneTrainer) for training support
 
 ---
 

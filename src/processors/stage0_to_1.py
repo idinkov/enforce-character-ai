@@ -44,27 +44,40 @@ class ProviderImportProcessor(BaseProcessor):
                 provider_type = provider_config.get('type', 'unknown')
 
                 if provider_id:
-                    self.log(f"Checking provider {i+1}/{provider_count}: {provider_type}")
+                    # Update progress for current provider
+                    if self.progress_callback:
+                        self.progress_callback(i, provider_count, f"Checking {provider_type}")
+
+                    self.log(f"Checking provider {i+1}/{provider_count}: {provider_type} (ID: {provider_id})")
 
                     try:
-                        downloaded_count = self.provider_manager.check_provider_now(character_dir, provider_id)
+                        downloaded_count = self.provider_manager.check_provider_now(
+                            character_dir, provider_id,
+                            progress_callback=self.progress_callback,
+                            log_callback=self.log
+                        )
+
                         if downloaded_count >= 0:
                             total_downloaded += downloaded_count
                             if downloaded_count > 0:
-                                self.log(f"Downloaded {downloaded_count} new files from {provider_type}")
+                                self.log(f"✓ Downloaded {downloaded_count} new files from {provider_type}")
                             else:
-                                self.log(f"No new files found from {provider_type}")
+                                self.log(f"✓ No new files found from {provider_type}")
                         else:
-                            self.log(f"Failed to check provider: {provider_type}")
+                            self.log(f"✗ Failed to check provider: {provider_type}")
                     except Exception as e:
-                        self.log(f"Error checking provider {provider_type}: {e}")
+                        self.log(f"✗ Error checking provider {provider_type}: {e}")
                         continue
 
-            self.log(f"Provider checking completed! Total new files downloaded: {total_downloaded}")
+            # Update progress to complete
+            if self.progress_callback:
+                self.progress_callback(provider_count, provider_count, "Provider checks complete")
+
+            self.log(f"✓ Provider checking completed! Total new files downloaded: {total_downloaded}")
             return total_downloaded
 
         except Exception as e:
-            self.log(f"Error during provider checking: {e}")
+            self.log(f"✗ Error during provider checking: {e}")
             return 0
 
     def process_character(self, char_name):

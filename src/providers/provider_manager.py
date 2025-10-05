@@ -61,16 +61,18 @@ class ProviderManager:
                 }
         return None
 
-    def create_provider_instance(self, provider_type: str, character_name: str = None) -> Optional[BaseProvider]:
+    def create_provider_instance(self, provider_type: str, character_name: str = None,
+                                progress_callback=None, log_callback=None) -> Optional[BaseProvider]:
         """Create an instance of the specified provider."""
         provider_class = self.get_provider_by_name(provider_type)
         if provider_class:
-            return provider_class(character_name)
+            return provider_class(character_name, progress_callback, log_callback)
         return None
 
     def add_provider_to_character(self, character_dir: str, provider_type: str,
                                  params: Dict[str, Any], download_now: bool = True,
-                                 auto_check: bool = True, provider_id: str = None) -> bool:
+                                 auto_check: bool = True, provider_id: str = None,
+                                 progress_callback=None, log_callback=None) -> bool:
         """
         Add a provider to a character.
 
@@ -81,16 +83,21 @@ class ProviderManager:
             download_now: Whether to download immediately
             auto_check: Whether to enable automatic checking
             provider_id: Optional unique identifier for the provider instance
+            progress_callback: Callback for progress updates
+            log_callback: Callback for log messages
 
         Returns:
             True if successful, False otherwise
         """
         try:
             character_name = os.path.basename(character_dir)
-            provider = self.create_provider_instance(provider_type, character_name)
+            provider = self.create_provider_instance(provider_type, character_name, progress_callback, log_callback)
 
             if not provider:
-                print(f"Unknown provider type: {provider_type}")
+                if log_callback:
+                    log_callback(f"Unknown provider type: {provider_type}")
+                else:
+                    print(f"Unknown provider type: {provider_type}")
                 return False
 
             # Save provider configuration
@@ -105,12 +112,20 @@ class ProviderManager:
             if download_now:
                 output_dir = provider.create_output_directory(character_dir)
                 downloaded_files = provider.download(output_dir, **params)
-                print(f"Downloaded {len(downloaded_files)} files from {provider_type}")
+                message = f"Downloaded {len(downloaded_files)} files from {provider_type}"
+                if log_callback:
+                    log_callback(message)
+                else:
+                    print(message)
 
             return True
 
         except Exception as e:
-            print(f"Error adding provider to character: {e}")
+            error_msg = f"Error adding provider to character: {e}"
+            if log_callback:
+                log_callback(error_msg)
+            else:
+                print(error_msg)
             return False
 
     def remove_provider_from_character(self, character_dir: str, provider_id: str) -> bool:
@@ -165,7 +180,48 @@ class ProviderManager:
             print(f"Error getting character providers: {e}")
             return []
 
-    def check_provider_now(self, character_dir: str, provider_id: str) -> int:
+    def check_provider_now_threaded(self, character_dir: str, provider_id: str,
+                                   progress_callback=None, log_callback=None,
+                                   completion_callback=None) -> threading.Thread:
+        """
+        Run provider check in a separate thread to prevent UI freezing.
+
+        Args:
+            character_dir: Path to character directory
+            provider_id: Provider ID to check
+            progress_callback: Callback for progress updates
+            log_callback: Callback for log messages
+            completion_callback: Callback when operation completes (receives result count)
+
+        Returns:
+            Thread object that can be used to monitor the operation
+        """
+        def threaded_check():
+            try:
+                if log_callback:
+                    log_callback("Starting threaded provider check...")
+
+                result = self.check_provider_now(
+                    character_dir, provider_id,
+                    progress_callback, log_callback
+                )
+
+                if completion_callback:
+                    completion_callback(result)
+
+            except Exception as e:
+                error_msg = f"Error in threaded provider check: {e}"
+                if log_callback:
+                    log_callback(error_msg)
+                if completion_callback:
+                    completion_callback(-1)  # Indicate error
+
+        thread = threading.Thread(target=threaded_check, daemon=True)
+        thread.start()
+        return thread
+
+    def check_provider_now(self, character_dir: str, provider_id: str,
+                           progress_callback=None, log_callback=None) -> int:
         """Manually trigger a check for new media from a specific provider by ID."""
         try:
             providers = self.get_character_providers(character_dir)
@@ -180,14 +236,18 @@ class ProviderManager:
                     break
 
             if provider_config is None:
-                print(f"Provider with ID {provider_id} not found")
+                error_msg = f"Provider with ID {provider_id} not found"
+                if log_callback:
+                    log_callback(error_msg)
+                else:
+                    print(error_msg)
                 return 0
 
             provider_type = provider_config.get('type')
             params = provider_config.get('params', {})
 
             character_name = os.path.basename(character_dir)
-            provider = self.create_provider_instance(provider_type, character_name)
+            provider = self.create_provider_instance(provider_type, character_name, progress_callback, log_callback)
 
             if provider:
                 # Load existing history with provider ID
@@ -206,14 +266,26 @@ class ProviderManager:
                 # Save the updated provider configuration back to the file
                 self._update_provider_config_in_file(character_dir, provider_index, provider_config)
 
-                print(f"Provider check completed: {len(downloaded_files)} new files downloaded")
+                success_msg = f"Provider check completed: {len(downloaded_files)} new files downloaded"
+                if log_callback:
+                    log_callback(success_msg)
+                else:
+                    print(success_msg)
                 return len(downloaded_files)
             else:
-                print(f"Failed to create provider instance for type: {provider_type}")
+                error_msg = f"Failed to create provider instance for type: {provider_type}"
+                if log_callback:
+                    log_callback(error_msg)
+                else:
+                    print(error_msg)
                 return 0
 
         except Exception as e:
-            print(f"Error checking provider: {e}")
+            error_msg = f"Error checking provider: {e}"
+            if log_callback:
+                log_callback(error_msg)
+            else:
+                print(error_msg)
             return 0
 
     def _update_provider_config_in_file(self, character_dir: str, provider_index: int, updated_config: dict):

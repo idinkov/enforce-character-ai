@@ -10,6 +10,7 @@ import os
 from pathlib import Path
 import time
 from ..models import get_model_manager
+from ..utils.package_installer import PackageInstaller
 
 
 class SplashScreen:
@@ -156,6 +157,48 @@ class SplashScreen:
             self.splash.destroy()
             self.splash = None
 
+    def _restart_application(self):
+        """Restart the application to reinitialize PyTorch with GPU support."""
+        try:
+            import time
+
+            # Show a message to the user
+            self.update_progress(100, "Restarting application in 2 seconds...")
+            time.sleep(2)
+
+            # Close splash screen
+            if self.splash:
+                self.splash.quit()
+
+            # Restart the application using the same Python executable and script
+            import subprocess
+
+            # Get the main script path (main.py)
+            main_script = Path(__file__).parent.parent.parent / "main.py"
+
+            print(f"Restarting application: {sys.executable} {main_script}")
+
+            # Start new instance
+            if os.name == 'nt':  # Windows
+                # Use pythonw.exe to avoid console window if available
+                python_exe = sys.executable.replace('python.exe', 'pythonw.exe')
+                if not Path(python_exe).exists():
+                    python_exe = sys.executable
+                subprocess.Popen([python_exe, str(main_script)],
+                               creationflags=subprocess.CREATE_NEW_PROCESS_GROUP)
+            else:  # Unix-like
+                subprocess.Popen([sys.executable, str(main_script)])
+
+            # Exit current instance
+            sys.exit(0)
+
+        except Exception as e:
+            print(f"Error restarting application: {e}")
+            import traceback
+            traceback.print_exc()
+            # If restart fails, continue with current instance
+            self.update_progress(self.current_progress, "Restart failed, continuing with current session...")
+
     def run_startup_sequence(self, on_complete_callback=None, on_error_callback=None):
         """Run the startup sequence in a separate thread."""
         def startup_thread():
@@ -208,134 +251,33 @@ class SplashScreen:
         """Install or update requirements from requirements.txt."""
         try:
             requirements_path = Path(__file__).parent.parent.parent / "requirements.txt"
-            if requirements_path.exists():
-                self.update_progress(self.current_progress, "Installing packages...")
 
-                # Get the current environment's pip executable
-                pip_executable = [sys.executable, "-m", "pip"]
+            # Create package installer with progress callbacks
+            installer = PackageInstaller(
+                progress_callback=lambda pct, msg: self.update_progress(self.current_progress, msg),
+                cancel_check_callback=lambda: self.cancel_flag
+            )
 
-                # Check if we're in a virtual environment
-                if hasattr(sys, 'real_prefix') or (hasattr(sys, 'base_prefix') and sys.base_prefix != sys.prefix):
-                    env_info = f"(virtual env: {sys.prefix})"
-                else:
-                    env_info = f"(system env: {sys.prefix})"
+            # Step 1: Install PyTorch first with specific CUDA version
+            self.update_progress(self.current_progress, "Installing PyTorch with CUDA 12.8...")
+            pytorch_success, needs_restart = installer.install_pytorch(version="2.8.0", cuda_version="cu128")
 
-                self.update_progress(self.current_progress, f"Installing packages in {env_info}...")
+            if not pytorch_success:
+                print("PyTorch installation failed, but continuing...")
+                self.update_progress(self.current_progress, "PyTorch installation failed, continuing...")
+            elif needs_restart:
+                # PyTorch was installed/upgraded, need to restart the application
+                print("PyTorch installed successfully. Application restart required.")
+                self.update_progress(self.current_progress, "PyTorch installed! Restarting application...")
+                self._restart_application()
+                return False  # Stop further initialization
 
-                # Run pip install with verbose output
-                cmd = pip_executable + ["install", "-r", str(requirements_path), "--verbose"]
+            # Step 2: Install other requirements
+            self.update_progress(self.current_progress, "Installing other packages...")
+            success = installer.install_requirements(requirements_path)
 
-                process = subprocess.Popen(
-                    cmd,
-                    stdout=subprocess.PIPE,
-                    stderr=subprocess.STDOUT,
-                    universal_newlines=True,
-                    cwd=str(requirements_path.parent),
-                    bufsize=1  # Line buffered
-                )
+            return success
 
-                # Monitor the process and show real-time output
-                install_log = []
-                current_package = ""
-
-                while True:
-                    if self.cancel_flag:
-                        process.terminate()
-                        return False
-
-                    line = process.stdout.readline()
-                    if line == '' and process.poll() is not None:
-                        break
-
-                    if line:
-                        line = line.strip()
-                        install_log.append(line)
-
-                        # Extract package name from pip output
-                        if "Collecting" in line:
-                            try:
-                                current_package = line.split("Collecting ")[1].split(">=")[0].split("==")[0].split("[")[0]
-                                self.update_progress(
-                                    self.current_progress,
-                                    f"Collecting {current_package}..."
-                                )
-                            except:
-                                pass
-                        elif "Installing collected packages:" in line:
-                            self.update_progress(
-                                self.current_progress,
-                                "Installing collected packages..."
-                            )
-                        elif "Successfully installed" in line:
-                            packages = line.replace("Successfully installed ", "").split()
-                            if packages:
-                                self.update_progress(
-                                    self.current_progress,
-                                    f"Successfully installed: {', '.join(packages[:3])}{'...' if len(packages) > 3 else ''}"
-                                )
-                        elif "Requirement already satisfied:" in line:
-                            try:
-                                package = line.split("Requirement already satisfied: ")[1].split(" in")[0]
-                                self.update_progress(
-                                    self.current_progress,
-                                    f"Already satisfied: {package}"
-                                )
-                            except:
-                                pass
-                        elif "Building wheel for" in line:
-                            try:
-                                package = line.split("Building wheel for ")[1].split(" (")[0]
-                                self.update_progress(
-                                    self.current_progress,
-                                    f"Building wheel for {package}..."
-                                )
-                            except:
-                                pass
-                        elif "Installing build dependencies" in line:
-                            self.update_progress(
-                                self.current_progress,
-                                "Installing build dependencies..."
-                            )
-                        elif "Getting requirements to build wheel" in line:
-                            self.update_progress(
-                                self.current_progress,
-                                "Getting build requirements..."
-                            )
-                        elif "ERROR:" in line or "FAILED:" in line:
-                            self.update_progress(
-                                self.current_progress,
-                                f"Error: {line[:50]}..."
-                            )
-                            print(f"Pip install error: {line}")
-
-                    # Small delay to prevent UI freezing
-                    time.sleep(0.01)
-
-                return_code = process.returncode
-
-                if return_code == 0:
-                    self.update_progress(
-                        self.current_progress,
-                        "Package installation completed successfully!"
-                    )
-                    print("Package installation completed successfully")
-                else:
-                    self.update_progress(
-                        self.current_progress,
-                        f"Package installation failed (exit code: {return_code})"
-                    )
-                    print(f"Package installation failed with exit code: {return_code}")
-                    # Print last few lines of log for debugging
-                    if install_log:
-                        print("Last few lines of pip install log:")
-                        for line in install_log[-10:]:
-                            print(f"  {line}")
-
-                return return_code == 0
-            else:
-                self.update_progress(self.current_progress, "No requirements.txt found, skipping...")
-                print("No requirements.txt found, skipping package installation")
-                return True
 
         except Exception as e:
             error_msg = f"Error installing requirements: {e}"

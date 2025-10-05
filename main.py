@@ -26,6 +26,7 @@ from src.services.gpu_service import get_gpu_service
 from src.ui.character_tab import CharacterTab
 from src.ui.images_tab import ImagesTab
 from src.ui.provider_tab import ProviderTab
+from src.ui.create_tab import CreateTab
 from src.ui.splash_screen import SplashScreen
 from src.ui.status_bar import StatusBar
 
@@ -252,10 +253,11 @@ class DatasetAIManagerApp:
         self.notebook = ttk.Notebook(self.root)
         self.notebook.pack(fill="both", expand=True, padx=10, pady=10)
 
-        # Create all tabs (removed ProcessingTab)
+        # Create all tabs in numbered order
         self.character_tab = CharacterTab(self.notebook, self.character_repo, self.image_service)
-        self.images_tab = ImagesTab(self.notebook, self.image_service, self.progress_tracker, self.character_repo, self)
         self.provider_tab = ProviderTab(self.notebook, self.provider_manager, self.characters_path)
+        self.images_tab = ImagesTab(self.notebook, self.image_service, self.progress_tracker, self.character_repo, self)
+        self.create_tab = CreateTab(self.notebook)
 
         # Pass pre-loaded character cache from splash screen to character tab
         if self.splash and hasattr(self.splash, 'character_info_cache'):
