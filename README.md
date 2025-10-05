@@ -1,6 +1,6 @@
 # Enforce Character AI 0.1.1
 
-<img src="docs/images/app.png" alt="App Screenshot" width="512" height="512" />
+<img src="docs/images/app.png" alt="App" width="512" height="512" />
 
 ## Overview
 
