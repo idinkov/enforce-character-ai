@@ -16,6 +16,16 @@ Enforce Character AI is a comprehensive desktop application for managing, proces
 - **Splash Screen & Error Handling:** Professional startup experience and robust error reporting.
 - **Extensible Architecture:** Easily add new processing stages or providers.
 
+## Changelog
+
+### Version 0.1.1 (?)
+- Add auto installing of pytorch with CUDA support if GPU is available.
+- Cropping face image now rotates the face to be straight, and crops more area to include the entire head.
+- Added install.bat and install.sh which installs and launches the app.
+
+### Version 0.1.0 (23.09.2025)
+- Initial version.
+
 ## Folder Structure
 
 ```
@@ -103,16 +113,6 @@ Each stage is implemented as a processor in `src/processors/` and can be extende
 ## Contributing
 
 Contributions are welcome! Please open issues or submit pull requests for bug fixes, new features, or improvements.
-
-## Changelog
-
-### Version 0.1.1 (?)
-- Add auto installing of pytorch with CUDA support if GPU is available.
-- Cropping face image now rotates the face to be straight, and crops more area to include the entire head.
-- Added install.bat and install.sh which installs and launches the app.
-
-### Version 0.1.0 (23.09.2025)
-- Initial version.
 
 ## License
 
