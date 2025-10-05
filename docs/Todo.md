@@ -1,9 +1,8 @@
 # Planned Tasks and Features
 
 Fixes for 0.1.1:
-1. Improve provider to support progress tracking of the import. Implement in stage 0 to 1.
-2. When Automatic GFPGAN is enabled, it upscales only the faces.
-3. Fix progress tracking inside training queue tab. Also automatically show when training has started and hide the messagebox for success.
+1. ✅ **COMPLETED**: When Automatic GFPGAN is enabled, it upscales only the faces. Switch to Real-ESRGAN.
+2. Fix progress tracking inside training queue tab. Also automatically show when training has started and hide the messagebox for success.
 
 Fixes for 0.1.2:
 1. Improve the speed of character selection tab.

@@ -24,6 +24,8 @@ Enforce Character AI is a comprehensive desktop application for managing, proces
 - Added start.bat and start.sh which installs and launches the app.
 - Improve Providers tab to support progress tracking of the import and to not freeze the app on scene detection.
 - Fix YouTube provider to work.
+- Make requirements.txt strict and update to latest packages.
+- Implement Real-ESRGAN for upscaling instead of GFPGAN when Automatic GFPGAN is enabled & enable automatic upscale.
 
 ### Version 0.1.0 (23.09.2025)
 - Initial version.
@@ -54,7 +56,7 @@ requirements.txt      # Python dependencies
    - On Windows: `start.bat`
    - On Linux/MacOS: `start.sh`
    
-   This will set up a virtual environment, install dependencies, and download necessary models.
+   This will set up a virtual environment, install dependencies, download necessary models, and launch the application.
 
 
 ### Prerequisites (Manual Installation)
