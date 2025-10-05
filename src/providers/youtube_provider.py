@@ -1,23 +1,22 @@
 """
 YouTube provider for downloading videos from YouTube channels or playlists and extracting frames.
-Uses pytube library for downloading and scene detection for frame extraction.
+Uses yt-dlp for downloading and scene detection for frame extraction.
 """
 
 import os
 import re
+import json
+import subprocess
 from typing import Dict, List, Any, Optional
 from .base_provider import BaseProvider
 from ..utils.video_processor import VideoProcessor
 
 try:
-    from pytube import YouTube, Channel, Playlist
-    PYTUBE_AVAILABLE = True
+    import yt_dlp
+    YT_DLP_AVAILABLE = True
 except ImportError:
-    PYTUBE_AVAILABLE = False
-    # Define placeholder classes to avoid NameError
-    YouTube = None
-    Channel = None
-    Playlist = None
+    YT_DLP_AVAILABLE = False
+    yt_dlp = None
 
 
 class YoutubeProvider(BaseProvider):
@@ -29,8 +28,8 @@ class YoutubeProvider(BaseProvider):
 
     def download(self, output_dir: str, **params) -> List[str]:
         """Download videos from YouTube and extract frames."""
-        if not PYTUBE_AVAILABLE:
-            raise ImportError("pytube library is required. Install with: pip install pytube")
+        if not YT_DLP_AVAILABLE:
+            raise ImportError("yt-dlp library is required. Install with: pip install yt-dlp")
 
         video_url = params.get('video_url')
         channel_url = params.get('channel_url')
@@ -58,7 +57,7 @@ class YoutubeProvider(BaseProvider):
         try:
             if video_url:
                 downloaded_files.extend(self._download_single_video(
-                    video_url, output_dir, quality, extract_frames, frames_per_scene, keep_videos
+                    video_url, output_dir, quality, extract_frames, frames_per_scene, keep_videos, max_count
                 ))
             elif channel_url:
                 downloaded_files.extend(self._download_channel_videos(
@@ -79,13 +78,16 @@ class YoutubeProvider(BaseProvider):
 
         return downloaded_files
 
-    def _download_single_video(self, video_url: str, output_dir: str, quality: str, extract_frames: bool, frames_per_scene: int, keep_videos: bool) -> List[str]:
-        """Download a single YouTube video and optionally extract frames."""
+    def _download_single_video(self, video_url: str, output_dir: str, quality: str, extract_frames: bool, frames_per_scene: int, keep_videos: bool, max_count: int = 1) -> List[str]:
+        """Download a single YouTube video using yt-dlp and optionally extract frames."""
         downloaded_files = []
 
         try:
-            yt = YouTube(video_url)
-            video_id = self._extract_video_id(video_url)
+            print(f"Processing video: {video_url}")
+
+            # Clean the URL to remove extra parameters that might cause issues
+            clean_url = self._clean_youtube_url(video_url)
+            video_id = self._extract_video_id(clean_url)
 
             if not self.is_duplicate(video_id, output_dir):
                 # Create temporary directory for video download if extracting frames
@@ -96,7 +98,7 @@ class YoutubeProvider(BaseProvider):
                 else:
                     video_output_dir = output_dir
 
-                filepath = self._download_video(yt, video_output_dir, quality)
+                filepath = self._download_video_with_yt_dlp(clean_url, video_output_dir, quality)
                 if filepath:
                     if extract_frames and self.video_processor:
                         # Extract frames from the downloaded video
@@ -113,18 +115,21 @@ class YoutubeProvider(BaseProvider):
                                 pass
                     else:
                         downloaded_files.append(filepath)
+            else:
+                print(f"Video {video_id} already downloaded, skipping...")
+
         except Exception as e:
             print(f"Error downloading video {video_url}: {e}")
 
         return downloaded_files
 
     def _download_channel_videos(self, channel_url: str, output_dir: str, max_count: int, quality: str, extract_frames: bool, frames_per_scene: int, keep_videos: bool) -> List[str]:
-        """Download videos from a YouTube channel and optionally extract frames."""
+        """Download videos from a YouTube channel using yt-dlp and optionally extract frames."""
         downloaded_files = []
 
         try:
-            channel = Channel(channel_url)
-            count = 0
+            if not YT_DLP_AVAILABLE:
+                raise ImportError("yt-dlp library is required for channel downloads")
 
             # Create temporary directory for video downloads if extracting frames
             if extract_frames and not keep_videos:
@@ -134,16 +139,18 @@ class YoutubeProvider(BaseProvider):
             else:
                 video_output_dir = output_dir
 
-            for video in channel.video_urls:
+            # Get video URLs from channel using yt-dlp
+            video_urls = self._get_channel_video_urls(channel_url, max_count)
+
+            count = 0
+            for video_url in video_urls:
                 if count >= max_count:
                     break
 
                 try:
-                    yt = YouTube(video)
-                    video_id = self._extract_video_id(video)
-
+                    video_id = self._extract_video_id(video_url)
                     if not self.is_duplicate(video_id, output_dir):
-                        filepath = self._download_video(yt, video_output_dir, quality)
+                        filepath = self._download_video_with_yt_dlp(video_url, video_output_dir, quality)
                         if filepath:
                             if extract_frames and self.video_processor:
                                 # Extract frames from the downloaded video
@@ -171,12 +178,12 @@ class YoutubeProvider(BaseProvider):
         return downloaded_files
 
     def _download_playlist_videos(self, playlist_url: str, output_dir: str, max_count: int, quality: str, extract_frames: bool, frames_per_scene: int, keep_videos: bool) -> List[str]:
-        """Download videos from a YouTube playlist and optionally extract frames."""
+        """Download videos from a YouTube playlist using yt-dlp and optionally extract frames."""
         downloaded_files = []
 
         try:
-            playlist = Playlist(playlist_url)
-            count = 0
+            if not YT_DLP_AVAILABLE:
+                raise ImportError("yt-dlp library is required for playlist downloads")
 
             # Create temporary directory for video downloads if extracting frames
             if extract_frames and not keep_videos:
@@ -186,16 +193,18 @@ class YoutubeProvider(BaseProvider):
             else:
                 video_output_dir = output_dir
 
-            for video_url in playlist.video_urls:
+            # Get video URLs from playlist using yt-dlp
+            video_urls = self._get_playlist_video_urls(playlist_url, max_count)
+
+            count = 0
+            for video_url in video_urls:
                 if count >= max_count:
                     break
 
                 try:
-                    yt = YouTube(video_url)
                     video_id = self._extract_video_id(video_url)
-
                     if not self.is_duplicate(video_id, output_dir):
-                        filepath = self._download_video(yt, video_output_dir, quality)
+                        filepath = self._download_video_with_yt_dlp(video_url, video_output_dir, quality)
                         if filepath:
                             if extract_frames and self.video_processor:
                                 # Extract frames from the downloaded video
@@ -235,35 +244,136 @@ class YoutubeProvider(BaseProvider):
             print(f"Error extracting frames from video {video_path}: {e}")
             return []
 
-    def _download_video(self, yt, output_dir: str, quality: str) -> Optional[str]:
-        """Download a YouTube video."""
-        try:
-            if quality == 'highest':
-                stream = yt.streams.get_highest_resolution()
-            elif quality == 'lowest':
-                stream = yt.streams.get_lowest_resolution()
-            else:
-                stream = yt.streams.filter(res=quality).first()
-                if not stream:
-                    stream = yt.streams.get_highest_resolution()
+    def _download_video_with_yt_dlp(self, video_url: str, output_dir: str, quality: str) -> Optional[str]:
+        """Download a YouTube video using yt-dlp with retry logic."""
+        import time
 
-            if stream:
-                filename = f"{self.get_valid_filename(yt.title)}_{yt.video_id}.mp4"
-                filepath = os.path.join(output_dir, filename)
-                stream.download(output_path=output_dir, filename=filename)
-                print(f"Downloaded video: {filename}")
-                return filepath
+        max_retries = 3
+        retry_delay = 2
 
-        except Exception as e:
-            print(f"Error downloading video {yt.title}: {e}")
+        for attempt in range(max_retries):
+            try:
+                print(f"Downloading with yt-dlp (attempt {attempt + 1}): {video_url}")
+
+                # Configure yt-dlp options
+                ydl_opts = {
+                    'outtmpl': os.path.join(output_dir, '%(title)s_%(id)s.%(ext)s'),
+                    'format': self._get_format_selector(quality),
+                    'noplaylist': True,
+                    'extractaudio': False,
+                    'ignoreerrors': True,
+                    'no_warnings': False,
+                }
+
+                with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+                    # Extract info first to get the filename
+                    info = ydl.extract_info(video_url, download=False)
+                    if not info:
+                        print(f"Could not extract video info for: {video_url}")
+                        continue
+
+                    # Generate the expected filename
+                    filename = ydl.prepare_filename(info)
+
+                    # Download the video
+                    ydl.download([video_url])
+
+                    # Check if file exists and return path
+                    if os.path.exists(filename):
+                        print(f"Successfully downloaded: {os.path.basename(filename)}")
+                        return filename
+                    else:
+                        print(f"Download completed but file not found: {filename}")
+                        return None
+
+            except Exception as e:
+                error_msg = str(e)
+                print(f"Attempt {attempt + 1} failed: {error_msg}")
+
+                # Check for specific errors that might be resolved with retry
+                if "HTTP Error 400" in error_msg or "Bad Request" in error_msg:
+                    if attempt < max_retries - 1:
+                        print(f"HTTP 400 error detected, retrying in {retry_delay} seconds...")
+                        time.sleep(retry_delay)
+                        continue
+                elif "unavailable" in error_msg.lower() or "private" in error_msg.lower():
+                    print(f"Video is unavailable or private, skipping...")
+                    return None
+                elif attempt < max_retries - 1:
+                    print(f"Retrying in {retry_delay} seconds...")
+                    time.sleep(retry_delay)
+                    continue
+                else:
+                    print(f"All retry attempts failed for video: {video_url}")
+                    return None
 
         return None
+
+    def _get_format_selector(self, quality: str) -> str:
+        """Get youtube-dl format selector based on quality preference."""
+        if quality == 'highest':
+            return 'best[ext=mp4]/best'
+        elif quality == 'lowest':
+            return 'worst[ext=mp4]/worst'
+        elif quality in ['720p', '1080p', '480p', '360p']:
+            # Try to get specific resolution, fallback to best
+            height = quality.replace('p', '')
+            return f'best[height<={height}][ext=mp4]/best[ext=mp4]/best'
+        else:
+            # Default to best quality
+            return 'best[ext=mp4]/best'
+
+    def _get_channel_video_urls(self, channel_url: str, max_count: int) -> List[str]:
+        """Get video URLs from a YouTube channel using yt-dlp."""
+        try:
+            ydl_opts = {
+                'quiet': True,
+                'extract_flat': True,
+                'playlistend': max_count,
+            }
+
+            with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+                info = ydl.extract_info(channel_url, download=False)
+                if 'entries' in info:
+                    video_urls = []
+                    for entry in info['entries'][:max_count]:
+                        if entry and 'id' in entry:
+                            video_urls.append(f"https://www.youtube.com/watch?v={entry['id']}")
+                    return video_urls
+
+        except Exception as e:
+            print(f"Error extracting channel videos: {e}")
+
+        return []
+
+    def _get_playlist_video_urls(self, playlist_url: str, max_count: int) -> List[str]:
+        """Get video URLs from a YouTube playlist using yt-dlp."""
+        try:
+            ydl_opts = {
+                'quiet': True,
+                'extract_flat': True,
+                'playlistend': max_count,
+            }
+
+            with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+                info = ydl.extract_info(playlist_url, download=False)
+                if 'entries' in info:
+                    video_urls = []
+                    for entry in info['entries'][:max_count]:
+                        if entry and 'id' in entry:
+                            video_urls.append(f"https://www.youtube.com/watch?v={entry['id']}")
+                    return video_urls
+
+        except Exception as e:
+            print(f"Error extracting playlist videos: {e}")
+
+        return []
 
     def _extract_video_id(self, url: str) -> str:
         """Extract video ID from YouTube URL."""
         patterns = [
             r'(?:v=|\/)([0-9A-Za-z_-]{11}).*',
-            r'(?:embed\/)([0-9A-Za-z_-]{11})',
+            r'(?:embed\/)([0-9A-Zaz_-]{11})',
             r'(?:watch\?v=)([0-9A-Za-z_-]{11})'
         ]
 
@@ -318,3 +428,25 @@ class YoutubeProvider(BaseProvider):
             'keep_videos': 'Keep original video files after frame extraction'
         }
         return descriptions.get(param_name, param_name)
+
+    def _clean_youtube_url(self, url: str) -> str:
+        """Clean YouTube URL to remove parameters that might cause issues."""
+        import urllib.parse
+
+        # Parse the URL
+        parsed = urllib.parse.urlparse(url)
+
+        if 'youtube.com' in parsed.netloc:
+            # For youtube.com URLs, keep only the v parameter
+            query_params = urllib.parse.parse_qs(parsed.query)
+            if 'v' in query_params:
+                video_id = query_params['v'][0]
+                return f"https://www.youtube.com/watch?v={video_id}"
+        elif 'youtu.be' in parsed.netloc:
+            # For youtu.be URLs, extract video ID from path
+            video_id = parsed.path.lstrip('/')
+            return f"https://www.youtube.com/watch?v={video_id}"
+
+        return url
+
+
