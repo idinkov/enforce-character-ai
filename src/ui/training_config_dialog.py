@@ -41,19 +41,6 @@ def train_model(parent_frame, current_character, image_service, character_repo):
             messagebox.showerror("Error", "No images found in stage 7. Please complete image processing first.")
             return
 
-        # Check OneTrainer installation
-        ot_manager = get_onetrainer_manager()
-        status = ot_manager.get_installation_status()
-
-        if not status['is_functional']:
-            messagebox.showerror(
-                "OneTrainer Not Ready",
-                f"OneTrainer is not properly installed or functional.\n\n"
-                f"Error: {status.get('error_message', 'Unknown error')}\n\n"
-                "Please restart the application to install OneTrainer."
-            )
-            return
-
         # Load character data for training configuration
         character_data = None
         try:
@@ -68,9 +55,22 @@ def train_model(parent_frame, current_character, image_service, character_repo):
         except Exception as e:
             print(f"Warning: Could not load character data: {e}")
 
-        # Show training configuration dialog
+        # Show training configuration dialog FIRST (before OneTrainer check)
         config_result = show_training_config_dialog(parent_frame, current_character, len(image_files))
         if not config_result['confirmed']:
+            return
+
+        # Check OneTrainer installation AFTER dialog is confirmed
+        ot_manager = get_onetrainer_manager()
+        status = ot_manager.get_installation_status()
+
+        if not status['is_functional']:
+            messagebox.showerror(
+                "OneTrainer Not Ready",
+                f"OneTrainer is not properly installed or functional.\n\n"
+                f"Error: {status.get('error_message', 'Unknown error')}\n\n"
+                "Please restart the application to install OneTrainer."
+            )
             return
 
         # Get selected model ID from the dialog result
@@ -116,27 +116,13 @@ def train_model(parent_frame, current_character, image_service, character_repo):
             character_data=character_data
         )
 
-        # Show success message with queue information
-        queue_size = queue_manager.get_queue_size()
-        current_job = queue_manager.get_current_job()
-
-        if current_job and current_job.id == job_id:
-            # Job started immediately
-            message = f"Training started for '{current_character}'.\n\nThe training is now running in the background."
-        else:
-            # Job added to queue
-            position = queue_size  # Position in queue (1-based)
-            message = f"Training job added to queue for '{current_character}'.\n\n"
-            message += f"Position in queue: {position}\n"
-            if current_job:
-                message += f"Currently training: {current_job.character_name}"
-            else:
-                message += "No training currently running."
-
-        messagebox.showinfo("Training Queued", message)
+        # Automatically show Training Queue Manager window instead of messagebox
+        from src.ui.queue_manager_window import show_queue_manager
+        show_queue_manager(parent_frame)
 
         # Update status bar if accessible
         try:
+            queue_size = queue_manager.get_queue_size()
             if hasattr(parent_frame, 'master') and hasattr(parent_frame.master, 'app'):
                 app = parent_frame.master.app
                 if hasattr(app, 'set_status_bar_text'):
@@ -197,12 +183,26 @@ def show_training_config_dialog(parent_frame, current_character, image_count: in
     dialog.grab_set()
     dialog.resizable(False, False)
 
-    # Center the dialog
+    # Center the dialog relative to the main window
     dialog.transient(parent_frame)
     dialog.update_idletasks()
-    x = (dialog.winfo_screenwidth() // 2) - (420 // 2)
-    y = (dialog.winfo_screenheight() // 2) - (420 // 2)
-    dialog.geometry(f"400x420+{x}+{y}")
+
+    # Get the main window (root)
+    main_window = parent_frame.winfo_toplevel()
+
+    # Get main window position and size
+    main_x = main_window.winfo_x()
+    main_y = main_window.winfo_y()
+    main_width = main_window.winfo_width()
+    main_height = main_window.winfo_height()
+
+    # Calculate center position relative to main window
+    dialog_width = 400
+    dialog_height = 420
+    x = main_x + (main_width // 2) - (dialog_width // 2)
+    y = main_y + (main_height // 2) - (dialog_height // 2)
+
+    dialog.geometry(f"{dialog_width}x{dialog_height}+{x}+{y}")
 
     result: Dict[str, Any] = {'confirmed': False}
 

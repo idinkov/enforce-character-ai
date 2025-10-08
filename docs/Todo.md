@@ -1,13 +1,9 @@
 # Planned Tasks and Features
 
-Fixes for 0.1.2:
-1. Improve the speed of character selection tab.
-2. Make training dialogue appear instantly when user clicks Train button instead of waiting for the OneTrainer check. It should be done inside the Training Queue Manager.
-3. Implement Real-ESRGAN for upscaling instead of GFPGAN when Automatic GFPGAN is enabled & enable automatic upscale.
-4. Fix progress tracking inside training queue tab. Also automatically show when training has started and hide the messagebox for success.
-
 Fixes for 0.1.3:
-1. Improve the embedded scene detector with more adequate options, and use our custom C++ fast scene detector from -> https://github.com/idinkov/cuda-scene-detection
+1. Improve the speed of character selection tab.
+2. Implement Real-ESRGAN for upscaling instead of GFPGAN when Automatic GFPGAN is enabled & enable automatic upscale.
+3. Improve the embedded scene detector with more adequate options, and use our custom C++ fast scene detector from -> https://github.com/idinkov/cuda-scene-detection
 
 Fixes for 0.1.4:
 1. Fix inconsistent error CUDA not available error on training.
@@ -16,6 +12,10 @@ Fixes for 0.1.4:
 Additions for 0.2.0:
 1. Add hide to tray option. And right click menu on tray icon to open app, open models dir, exit app, check providers, check for updates.
 2. Allow users to create ZIP or TAR.GZ archives of archived characters. It should be accessible from Restore character dialog.
+3. Add topbar menu with File (Change characters dir, Exit), Help (Documentation, Check for Updates, About).
+
+Additions for 0.3.0:
+1. Create installer for Windows.
 
 Introduce comprehensive versioning system:
 1. Implement semantic versioning (e.g., MAJOR.MINOR.PATCH) to track changes and updates to the application.

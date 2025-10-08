@@ -177,7 +177,11 @@ class BaseProcessor(ABC):
 
             # Get list of source filenames (without extension) for matching
             source_files = self.get_image_files(source_dir, char_name) if source_dir.exists() else []
-            source_stems = {source_file.stem.lower() for source_file in source_files}
+
+            # Build lookup dictionaries for O(1) access
+            source_stems_lower = {source_file.stem.lower() for source_file in source_files}
+            # Map lowercase stem to original case stem
+            source_stem_case_map = {sf.stem.lower(): sf.stem for sf in source_files}
 
             renamed_count = 0
 
@@ -186,9 +190,10 @@ class BaseProcessor(ABC):
                 if file_path.is_file() and file_path.suffix.lower() in ['.jpg', '.jpeg', '.png', '.bmp', '.gif',
                                                                         '.tiff', '.webp']:
                     current_stem = file_path.stem
+                    current_stem_lower = current_stem.lower()
 
                     # Skip if already matches a source filename
-                    if current_stem.lower() in source_stems:
+                    if current_stem_lower in source_stems_lower:
                         continue
 
                     # Try to find matching source filename by removing prefix and/or suffix
@@ -197,13 +202,13 @@ class BaseProcessor(ABC):
                     # Method 1: Try removing prefix (everything up to first underscore)
                     if '_' in current_stem:
                         no_prefix = current_stem.split('_', 1)[1]
-                        if no_prefix.lower() in source_stems:
+                        if no_prefix.lower() in source_stems_lower:
                             best_match = no_prefix
 
                     # Method 2: Try removing suffix (everything after last underscore)
                     if not best_match and '_' in current_stem:
                         no_suffix = current_stem.rsplit('_', 1)[0]
-                        if no_suffix.lower() in source_stems:
+                        if no_suffix.lower() in source_stems_lower:
                             best_match = no_suffix
 
                     # Method 3: Try removing both prefix and suffix
@@ -211,23 +216,20 @@ class BaseProcessor(ABC):
                         parts = current_stem.split('_')
                         # Try middle part(s) - remove first and last part
                         middle_part = '_'.join(parts[1:-1])
-                        if middle_part and middle_part.lower() in source_stems:
+                        if middle_part and middle_part.lower() in source_stems_lower:
                             best_match = middle_part
 
-                    # Method 4: Try finding source filename as substring
+                    # Method 4: Try finding source filename as substring (optimized)
                     if not best_match:
-                        for source_stem in source_stems:
-                            source_stem_original = next(
-                                (sf.stem for sf in source_files if sf.stem.lower() == source_stem), source_stem)
-                            if source_stem_original.lower() in current_stem.lower():
+                        for source_stem_lower, source_stem_original in source_stem_case_map.items():
+                            if source_stem_lower in current_stem_lower:
                                 best_match = source_stem_original
                                 break
 
                     # Rename if we found a match
                     if best_match:
-                        # Preserve the original case from source files
-                        original_case_match = next(
-                            (sf.stem for sf in source_files if sf.stem.lower() == best_match.lower()), best_match)
+                        # Get the original case from the lookup map
+                        original_case_match = source_stem_case_map.get(best_match.lower(), best_match)
                         new_name = original_case_match + file_path.suffix
                         new_path = file_path.parent / new_name
 

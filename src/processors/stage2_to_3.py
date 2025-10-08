@@ -382,48 +382,52 @@ class UpscaleProcessor(BaseProcessor):
             # Create additional button frame for upscaling controls
             dialog_popup = self.progress_dialog.popup
 
-            # Add upscaling buttons frame before the existing button frame
-            self.upscaling_frame = ttk.LabelFrame(dialog_popup, text="Upscaling Controls")
-            self.upscaling_frame.pack(fill=tk.X, padx=10, pady=(0, 10))
+            # Unpack the log frame and button frame to reorder them
+            self.progress_dialog.log_frame.pack_forget()
+            self.progress_dialog.button_frame.pack_forget()
 
-            # Folder buttons frame
-            folder_frame = ttk.Frame(self.upscaling_frame)
-            folder_frame.pack(fill=tk.X, padx=10, pady=5)
+            # Add upscaling buttons frame after Current Stage and before log frame
+            self.upscaling_frame = ttk.LabelFrame(dialog_popup, text="Upscaling Controls")
+            self.upscaling_frame.pack(fill=tk.X, padx=10, pady=10)
+
+            # Single row for all buttons
+            buttons_frame = ttk.Frame(self.upscaling_frame)
+            buttons_frame.pack(fill=tk.X, padx=10, pady=5)
 
             # Open Input Folder button
             self.input_folder_button = ttk.Button(
-                folder_frame,
+                buttons_frame,
                 text="Open Input Folder",
                 command=self._open_input_folder
             )
-            self.input_folder_button.pack(side="left", padx=(0, 10))
+            self.input_folder_button.pack(side="left", padx=(0, 5))
 
             # Open Target Folder button
             self.target_folder_button = ttk.Button(
-                folder_frame,
+                buttons_frame,
                 text="Open Target Folder",
                 command=self._open_target_folder
             )
-            self.target_folder_button.pack(side="left")
-
-            # Action buttons frame
-            action_frame = ttk.Frame(self.upscaling_frame)
-            action_frame.pack(fill=tk.X, padx=10, pady=5)
+            self.target_folder_button.pack(side="left", padx=(0, 5))
 
             # Skip button
             self.skip_button = ttk.Button(
-                action_frame,
+                buttons_frame,
                 text="Skip Upscaling",
                 command=self._skip_upscaling
             )
-            self.skip_button.pack(side="left", padx=(0, 10))
+            self.skip_button.pack(side="left", padx=(0, 5))
 
             # Move to remaining button (initially hidden)
             self.remaining_button = ttk.Button(
-                action_frame,
+                buttons_frame,
                 text="Move Remaining Files",
                 command=self._move_remaining_files
             )
+
+            # Re-pack the log frame and button frame
+            self.progress_dialog.log_frame.pack(fill=tk.BOTH, expand=True, padx=10, pady=10)
+            self.progress_dialog.button_frame.pack(fill=tk.X, padx=10, pady=10)
 
         except Exception as e:
             self.log(f"Error adding upscaling buttons: {e}")

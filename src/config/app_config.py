@@ -15,7 +15,7 @@ class AppConfig:
 
     # Application info
     APP_NAME: str = "Enforce Character AI"
-    APP_VERSION: str = "0.1.1"
+    APP_VERSION: str = "0.1.2"
 
     # Window settings
     WINDOW_TITLE: str = "Enforce Character AI"

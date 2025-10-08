@@ -308,6 +308,14 @@ class TrainingQueueManager:
     def _monitor_job_process(self, job: TrainingJob):
         """Monitor a training job process until completion."""
         try:
+            # Find and monitor the log file for progress updates
+            log_monitoring_thread = threading.Thread(
+                target=self._monitor_job_log,
+                args=(job,),
+                daemon=True
+            )
+            log_monitoring_thread.start()
+
             while job.process and job.process.poll() is None:
                 # Check if job was marked for stopping
                 if job.status == TrainingJobStatus.STOPPING:
@@ -328,6 +336,8 @@ class TrainingQueueManager:
                     job.status = TrainingJobStatus.COMPLETED
                     # Generate training prompt file when training completes successfully
                     self._generate_training_prompt_file(job)
+                    # Clean up training directory after successful completion
+                    self._cleanup_training_directory(job)
                 else:
                     job.status = TrainingJobStatus.FAILED
                     job.error_message = f"Process exited with code {exit_code}"
@@ -345,6 +355,176 @@ class TrainingQueueManager:
 
             print(f"Error monitoring job process: {e}")
             self._notify_job_status_changed(job)
+
+    def _monitor_job_log(self, job: TrainingJob):
+        """Monitor the training log file for progress updates."""
+        import re
+
+        # Find the log file
+        log_file = self._find_training_log(job)
+        if not log_file:
+            print(f"Could not find log file for job {job.character_name}")
+            return
+
+        print(f"Monitoring log file for {job.character_name}: {log_file}")
+
+        last_size = 0
+        if log_file.exists():
+            last_size = log_file.stat().st_size
+
+        while job.status == TrainingJobStatus.RUNNING:
+            try:
+                if log_file.exists():
+                    current_size = log_file.stat().st_size
+
+                    if current_size > last_size:
+                        with open(log_file, 'r', encoding='utf-8', errors='ignore') as f:
+                            f.seek(last_size)
+                            new_content = f.read()
+
+                        if new_content.strip():
+                            self._parse_training_log(job, new_content)
+
+                        last_size = current_size
+
+                time.sleep(2)
+            except Exception as e:
+                print(f"Error monitoring log for {job.character_name}: {e}")
+                time.sleep(5)
+
+    def _find_training_log(self, job: TrainingJob) -> Optional[Path]:
+        """Find the training log file for a job."""
+        # Try character models directory first
+        character_dir = Path("characters") / job.character_name / "models"
+
+        if character_dir.exists():
+            # Look for training_* directories
+            training_dirs = [d for d in character_dir.iterdir()
+                           if d.is_dir() and d.name.startswith("training_")]
+
+            if training_dirs:
+                # Get most recent
+                latest_dir = max(training_dirs, key=lambda x: x.stat().st_mtime)
+                log_file = latest_dir / "training.log"
+                if log_file.exists():
+                    return log_file
+
+        return None
+
+    def _parse_training_log(self, job: TrainingJob, content: str):
+        """Parse training log content to extract progress information."""
+        import re
+
+        lines = content.split('\n')
+        updated = False
+
+        for line in lines:
+            line = line.strip()
+            if not line:
+                continue
+
+            # Parse epoch information: epoch: 45% 9/20
+            epoch_match = re.search(r'epoch:\s*(\d+)%.*?(\d+)/(\d+)', line)
+            if epoch_match:
+                job.progress['epoch_percent'] = int(epoch_match.group(1))
+                job.progress['current_epoch'] = int(epoch_match.group(2))
+                job.progress['total_epochs'] = int(epoch_match.group(3))
+                updated = True
+
+            # Parse step information: step: 91% 1820/2000 | loss=0.0891 | smooth loss=0.0945
+            step_match = re.search(r'step:\s*(\d+)%.*?(\d+)/(\d+).*?loss=([\d.]+).*?smooth loss=([\d.]+)', line)
+            if step_match:
+                job.progress['step_percent'] = int(step_match.group(1))
+                job.progress['current_step'] = int(step_match.group(2))
+                job.progress['total_steps'] = int(step_match.group(3))
+                job.progress['loss'] = float(step_match.group(4))
+                job.progress['smooth_loss'] = float(step_match.group(5))
+                updated = True
+
+            # Parse caching progress: caching: 67%
+            cache_match = re.search(r'caching:\s*(\d+)%', line)
+            if cache_match:
+                job.progress['stage'] = f"Caching: {cache_match.group(1)}%"
+                updated = True
+            elif 'Loading pipeline components' in line:
+                job.progress['stage'] = "Loading model..."
+                updated = True
+            elif 'enumerating sample paths' in line:
+                job.progress['stage'] = "Preparing dataset..."
+                updated = True
+            elif 'step:' in line and 'loss=' in line:
+                epoch = job.progress.get('current_epoch', 0)
+                job.progress['stage'] = f"Training - Epoch {epoch}"
+                updated = True
+
+        # Calculate ETA based on progress
+        if updated and job.started_at:
+            self._calculate_eta(job)
+            # Notify progress update
+            if job.on_progress_update:
+                job.on_progress_update(job)
+
+    def _calculate_eta(self, job: TrainingJob):
+        """Calculate estimated time to completion based on current progress."""
+        current_time = datetime.now()
+        elapsed = (current_time - job.started_at).total_seconds()
+
+        # Calculate based on step progress if available
+        current_step = job.progress.get('current_step', 0)
+        total_steps = job.progress.get('total_steps', 0)
+
+        if current_step > 0 and total_steps > 0:
+            # Time per step
+            time_per_step = elapsed / current_step
+            remaining_steps = total_steps - current_step
+            eta_seconds = remaining_steps * time_per_step
+            job.progress['eta_seconds'] = int(eta_seconds)
+
+            # Also calculate epoch ETA
+            current_epoch = job.progress.get('current_epoch', 0)
+            total_epochs = job.progress.get('total_epochs', 0)
+            if current_epoch > 0 and total_epochs > 0:
+                time_per_epoch = elapsed / current_epoch
+                remaining_epochs = total_epochs - current_epoch
+                epoch_eta_seconds = remaining_epochs * time_per_epoch
+                job.progress['epoch_eta_seconds'] = int(epoch_eta_seconds)
+
+    def _cleanup_training_directory(self, job: TrainingJob):
+        """Clean up the training directory after successful training completion."""
+        try:
+            import shutil
+
+            # Find the training directory
+            character_dir = Path("characters") / job.character_name / "models"
+
+            if not character_dir.exists():
+                print(f"Character models directory not found: {character_dir}")
+                return
+
+            # Look for training_* directories
+            training_dirs = [d for d in character_dir.iterdir()
+                           if d.is_dir() and d.name.startswith("training_")]
+
+            if not training_dirs:
+                print(f"No training directories found for {job.character_name}")
+                return
+
+            # Get the most recent training directory (should be the one we just completed)
+            latest_training_dir = max(training_dirs, key=lambda x: x.stat().st_mtime)
+
+            # Verify it's safe to delete (check if it has expected structure)
+            expected_subdirs = ['workspace', 'cache']
+            has_expected_structure = any((latest_training_dir / subdir).exists() for subdir in expected_subdirs)
+
+            if has_expected_structure:
+                print(f"Cleaning up training directory: {latest_training_dir}")
+                shutil.rmtree(latest_training_dir)
+                print(f"Successfully deleted training directory: {latest_training_dir}")
+            else:
+                print(f"Training directory doesn't have expected structure, skipping cleanup: {latest_training_dir}")
+
+        except Exception as e:
+            print(f"Error cleaning up training directory for {job.character_name}: {e}")
 
     def _generate_training_prompt_file(self, job: TrainingJob):
         """Generate the training prompt .txt file alongside the trained model."""
@@ -391,8 +571,12 @@ class TrainingQueueManager:
 
     def _on_job_progress_update(self, job: TrainingJob):
         """Handle job progress updates."""
-        # This could be implemented to parse log files and update progress
-        pass
+        # Notify the global callback if set
+        if self.on_job_status_changed:
+            try:
+                self.on_job_status_changed(job)
+            except Exception as e:
+                print(f"Error in progress update callback: {e}")
 
     def _notify_queue_changed(self):
         """Notify listeners that the queue has changed."""

@@ -152,11 +152,11 @@ class ProgressPopup:
         self.overall_percentage_label.pack(side="right", padx=(10, 0))
 
         # Current stage frame
-        stage_frame = ttk.LabelFrame(self.popup, text="Current Stage")
-        stage_frame.pack(fill="x", padx=10, pady=10)
+        self.stage_frame = ttk.LabelFrame(self.popup, text="Current Stage")
+        self.stage_frame.pack(fill="x", padx=10, pady=10)
 
         # Current stage info
-        stage_info_frame = ttk.Frame(stage_frame)
+        stage_info_frame = ttk.Frame(self.stage_frame)
         stage_info_frame.pack(fill="x", padx=10, pady=5)
 
         self.stage_label = ttk.Label(stage_info_frame, text="Initializing...", font=("Arial", 10))
@@ -166,7 +166,7 @@ class ProgressPopup:
         self.stage_eta_label.pack(side="right")
 
         # Stage progress bar with percentage
-        stage_progress_frame = ttk.Frame(stage_frame)
+        stage_progress_frame = ttk.Frame(self.stage_frame)
         stage_progress_frame.pack(fill="x", padx=10, pady=5)
 
         self.stage_progress_var = tk.DoubleVar()
@@ -181,12 +181,12 @@ class ProgressPopup:
         self.stage_percentage_label = ttk.Label(stage_progress_frame, text="0.0%", font=("Arial", 9))
         self.stage_percentage_label.pack(side="right", padx=(10, 0))
 
-        # Log frame
-        log_frame = ttk.LabelFrame(self.popup, text="Processing Log")
-        log_frame.pack(fill="both", expand=True, padx=10, pady=10)
+        # Log frame (will be packed after any processor-specific controls)
+        self.log_frame = ttk.LabelFrame(self.popup, text="Processing Log")
+        self.log_frame.pack(fill="both", expand=True, padx=10, pady=10)
 
         # Log text with scrollbar
-        log_scroll_frame = ttk.Frame(log_frame)
+        log_scroll_frame = ttk.Frame(self.log_frame)
         log_scroll_frame.pack(fill="both", expand=True, padx=5, pady=5)
 
         self.log_text = tk.Text(log_scroll_frame, height=6, wrap="word", font=("Consolas", 9))
@@ -197,17 +197,17 @@ class ProgressPopup:
         log_scrollbar.pack(side="right", fill="y")
 
         # Button frame
-        button_frame = ttk.Frame(self.popup)
-        button_frame.pack(fill="x", padx=10, pady=10)
+        self.button_frame = ttk.Frame(self.popup)
+        self.button_frame.pack(fill="x", padx=10, pady=10)
 
         # Cancel/Close button
-        self.cancel_button = ttk.Button(button_frame, text="Cancel", command=self._on_cancel)
+        self.cancel_button = ttk.Button(self.button_frame, text="Cancel", command=self._on_cancel)
         self.cancel_button.pack(side="right", padx=5)
 
         # Keep window on top option
         self.stay_on_top_var = tk.BooleanVar(value=True)
         stay_on_top_cb = ttk.Checkbutton(
-            button_frame,
+            self.button_frame,
             text="Keep on top",
             variable=self.stay_on_top_var,
             command=self._toggle_stay_on_top

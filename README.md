@@ -1,4 +1,4 @@
-# Enforce Character AI 0.1.1
+# Enforce Character AI 0.1.2
 
 <img src="docs/images/app.png" alt="App" width="512" height="512" />
 
@@ -17,6 +17,15 @@ Enforce Character AI is a comprehensive desktop application for managing, proces
 - **Extensible Architecture:** Easily add new processing stages or providers.
 
 ## Changelog
+
+### Version 0.1.2 (08.10.2025)
+- Fix inpainting, it was broken from 0.1.1 update of transformers version.
+- Fix slow showing of Training dialogue when user clicks Train button.
+- Fix large image box when no face is selected.
+- Improve progress tracking inside Training Queue Manager.
+- Speedup file normalization between stages.
+- Fix face cropping to not rotate.
+- Move the upscaling controls below the current stage in Processing All Stages window.
 
 ### Version 0.1.1 (05.10.2025)
 - Add auto installing of pytorch with CUDA support if GPU is available.
