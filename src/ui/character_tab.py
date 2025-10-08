@@ -621,11 +621,15 @@ class CharacterTab:
                 photo = ImageTk.PhotoImage(img)
                 self.face_image_label.config(image=str(photo), text="", width=display_width, height=display_height)
                 self.face_image_label.image = photo  # Keep a reference
+                # Show the label when there's a valid image
+                self.face_image_label.grid()
             except Exception as e:
-                self.face_image_label.config(image="", text=f"Error: {e}", width=400, height=400)
+                # Hide the label on error
+                self.face_image_label.grid_remove()
                 self.face_image_label.image = None
         else:
-            self.face_image_label.config(image="", text="No face image", width=400, height=400)
+            # Hide the label when no valid image path
+            self.face_image_label.grid_remove()
             self.face_image_label.image = None
 
     def get_current_character_name(self) -> Optional[str]:

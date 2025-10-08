@@ -55,33 +55,39 @@ class FaceProcessor:
         if abs(angle) < 0.1:  # Skip rotation if angle is negligible
             return image, landmarks
 
-        # Rotate image
+        # Store original dimensions
+        orig_width, orig_height = image.size
+        orig_center_x, orig_center_y = orig_width / 2, orig_height / 2
+
+        # Rotate image (PIL rotates around center and expands canvas)
         rotated_image = image.rotate(angle, expand=True, resample=Image.Resampling.BICUBIC)
 
         # If no landmarks, return early
         if landmarks is None:
             return rotated_image, None
 
-        # Calculate rotation matrix for landmarks
-        width, height = image.size
-        center_x, center_y = width / 2, height / 2
+        # Get new dimensions after expansion
+        new_width, new_height = rotated_image.size
+        new_center_x, new_center_y = new_width / 2, new_height / 2
+
+        # Calculate the offset between old center and new center
+        # This is how much the image "shifted" when the canvas expanded
         angle_rad = math.radians(angle)
 
-        # Rotate landmarks around image center
+        # Rotate landmarks around original image center
         rotated_landmarks = []
         for point in landmarks:
-            # Translate to origin
-            x = point[0] - center_x
-            y = point[1] - center_y
+            # Translate point to origin (relative to original center)
+            x = point[0] - orig_center_x
+            y = point[1] - orig_center_y
 
-            # Rotate
-            x_new = x * math.cos(angle_rad) - y * math.sin(angle_rad)
-            y_new = x * math.sin(angle_rad) + y * math.cos(angle_rad)
+            # Apply rotation matrix
+            x_rotated = x * math.cos(angle_rad) - y * math.sin(angle_rad)
+            y_rotated = x * math.sin(angle_rad) + y * math.cos(angle_rad)
 
-            # Translate back and adjust for expanded image size
-            new_width, new_height = rotated_image.size
-            x_final = x_new + new_width / 2
-            y_final = y_new + new_height / 2
+            # Translate to new center (the rotated image center)
+            x_final = x_rotated + new_center_x
+            y_final = y_rotated + new_center_y
 
             rotated_landmarks.append([x_final, y_final])
 
@@ -180,41 +186,6 @@ class FaceProcessor:
                 if img.mode != 'RGB':
                     img = img.convert('RGB')
 
-                # Calculate rotation angle if landmarks are provided
-                rotation_angle = 0.0
-                if landmarks is not None:
-                    if status_callback:
-                        status_callback("Calculating face rotation...")
-                    rotation_angle = FaceProcessor.calculate_rotation_angle(landmarks)
-
-                    if abs(rotation_angle) > 0.1:
-                        if status_callback:
-                            status_callback(f"Rotating face by {rotation_angle:.2f} degrees...")
-
-                        # Rotate the image and adjust face coordinates
-                        img, rotated_landmarks = FaceProcessor.rotate_image_and_landmarks(
-                            img, landmarks, rotation_angle
-                        )
-
-                        # Recalculate face bounding box from rotated landmarks
-                        if rotated_landmarks is not None:
-                            x_coords = rotated_landmarks[:, 0]
-                            y_coords = rotated_landmarks[:, 1]
-
-                            x_min = int(np.min(x_coords))
-                            y_min = int(np.min(y_coords))
-                            x_max = int(np.max(x_coords))
-                            y_max = int(np.max(y_coords))
-
-                            # Update face dictionary with rotated coordinates
-                            face = {
-                                'x': x_min,
-                                'y': y_min,
-                                'width': x_max - x_min,
-                                'height': y_max - y_min,
-                                'center_x': (x_min + x_max) // 2,
-                                'center_y': (y_min + y_max) // 2
-                            }
 
                 if status_callback:
                     status_callback("Calculating crop area...")

@@ -158,7 +158,20 @@ class DatasetAIManagerApp:
             self.root = tk.Tk()
 
         self.root.title(f"{config.WINDOW_TITLE} v{config.APP_VERSION}")
-        self.root.geometry(config.WINDOW_GEOMETRY)
+
+        # Parse window dimensions from config
+        # config.WINDOW_GEOMETRY is in format "WIDTHxHEIGHT"
+        width_height = config.WINDOW_GEOMETRY.split('+')[0]  # Remove any existing position
+        window_width, window_height = map(int, width_height.split('x'))
+
+        # Calculate center position before showing window
+        screen_width = self.root.winfo_screenwidth()
+        screen_height = self.root.winfo_screenheight()
+        x = (screen_width - window_width) // 2
+        y = (screen_height - window_height) // 2
+
+        # Set geometry with center position in one go
+        self.root.geometry(f"{window_width}x{window_height}+{x}+{y}")
 
         # Set the application icon
         try:
